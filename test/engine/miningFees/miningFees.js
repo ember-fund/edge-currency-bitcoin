@@ -24,11 +24,13 @@ describe(`Mining Fees`, function () {
       standardFeeHighAmount: '10000000',
       timestamp: 0
     }
+    console.log('earnComTestFees: ', earnComTestFees)
     const outBitcoinFees: BitcoinFees = calcFeesFromEarnCom(
-      inBitcoinFees,
-      earnComTestFees
+      earnComTestFees.fees
     )
-
+    Object.assign(outBitcoinFees, inBitcoinFees)
+    console.log('outBitcoinFees:', outBitcoinFees)
+    console.log('inBitcoinFees: ', inBitcoinFees)
     assert.equal(outBitcoinFees.standardFeeLowAmount, '100000')
     assert.equal(outBitcoinFees.standardFeeHighAmount, '10000000')
     assert.equal(outBitcoinFees.lowFee, '10')
@@ -46,8 +48,8 @@ describe(`Mining Fees`, function () {
       standardFeeHighAmount: '22222222',
       timestamp: 0
     }
-    const outBitcoinFees = calcFeesFromEarnCom(inBitcoinFees, [])
-
+    const outBitcoinFees = calcFeesFromEarnCom([])
+    Object.assign(outBitcoinFees, inBitcoinFees)
     assert.equal(outBitcoinFees.standardFeeLowAmount, '1111111')
     assert.equal(outBitcoinFees.standardFeeHighAmount, '22222222')
     assert.equal(outBitcoinFees.lowFee, '11')
@@ -65,8 +67,8 @@ describe(`Mining Fees`, function () {
       standardFeeHighAmount: '22222222',
       timestamp: 0
     }
-    const outBitcoinFees = calcFeesFromEarnCom(inBitcoinFees, null)
-
+    const outBitcoinFees = calcFeesFromEarnCom(null)
+    Object.assign(outBitcoinFees, inBitcoinFees)
     assert.equal(outBitcoinFees.standardFeeLowAmount, '1111111')
     assert.equal(outBitcoinFees.standardFeeHighAmount, '22222222')
     assert.equal(outBitcoinFees.lowFee, '11')
@@ -84,8 +86,8 @@ describe(`Mining Fees`, function () {
       standardFeeHighAmount: '22222222',
       timestamp: 0
     }
-    const outBitcoinFees = calcFeesFromEarnCom(inBitcoinFees, { fees: [] })
-
+    const outBitcoinFees = calcFeesFromEarnCom([])
+    Object.assign(outBitcoinFees, inBitcoinFees)
     assert.equal(outBitcoinFees.standardFeeLowAmount, '1111111')
     assert.equal(outBitcoinFees.standardFeeHighAmount, '22222222')
     assert.equal(outBitcoinFees.lowFee, '11')

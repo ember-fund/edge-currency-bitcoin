@@ -14,9 +14,10 @@ export const ES_FEE_STANDARD = 'standard'
 export const ES_FEE_HIGH = 'high'
 export const ES_FEE_CUSTOM = 'custom'
 
-const MAX_FEE = 999999999.0
+const MAX_FEE = Infinity
 const MAX_STANDARD_DELAY = 3
 const MIN_STANDARD_DELAY = 1
+const EARN_COM_INFINIY = 10000
 
 /**
  * Calculate the BitcoinFees object given a default BitcoinFees object and EarnComFees
@@ -25,9 +26,8 @@ const MIN_STANDARD_DELAY = 1
  * @returns {BitcoinFees}
  */
 export function calcFeesFromEarnCom (
-  bitcoinFees: BitcoinFees,
   earnComFeesJson: any
-): BitcoinFees {
+): $Shape<BitcoinFees> {
   let highDelay = 999999
   let lowDelay = 0
   let highFee = MAX_FEE
@@ -36,9 +36,7 @@ export function calcFeesFromEarnCom (
   let lowFee = MAX_FEE
 
   const valid = validateObject(earnComFeesJson, EarnComFeesSchema)
-  if (!valid) {
-    return bitcoinFees
-  }
+  if (!valid) return {}
 
   const earnComFees: EarnComFees = earnComFeesJson
   for (const fee of earnComFees.fees) {
@@ -49,21 +47,21 @@ export function calcFeesFromEarnCom (
 
     // Set the lowFee if the delay in blocks and minutes is less that 10000.
     // 21.co uses 10000 to mean infinite
-    if (fee.maxDelay < 10000 && fee.maxMinutes < 10000) {
-      if (fee.maxFee < lowFee) {
-        // Set the low fee if the current fee estimate is lower than the previously set low fee
-        lowDelay = fee.maxDelay
-        lowFee = fee.maxFee
-      }
+    if (
+      fee.maxDelay < EARN_COM_INFINIY &&
+      fee.maxMinutes < EARN_COM_INFINIY &&
+      fee.maxFee < lowFee
+    ) {
+      // Set the low fee if the current fee estimate is lower than the previously set low fee
+      lowDelay = fee.maxDelay
+      lowFee = fee.maxFee
     }
 
-    // Set the high fee only if the delay is 0
-    if (fee.maxDelay === 0) {
-      if (fee.maxFee < highFee) {
-        // Set the low fee if the current fee estimate is lower than the previously set high fee
-        highFee = fee.maxFee
-        highDelay = fee.maxDelay
-      }
+    // Set the high fee only if the delay is 0, highFee starts at infinite
+    if (fee.maxDelay === 0 && fee.minFee < highFee) {
+      // Set the low fee if the current fee estimate is lower than the previously set high fee
+      highFee = fee.minFee
+      highDelay = fee.maxDelay
     }
   }
 
@@ -118,27 +116,14 @@ export function calcFeesFromEarnCom (
     }
   }
 
-  //
-  // Check if we have a complete set of fee info.
-  //
-  if (
-    highFee < MAX_FEE &&
-    lowFee < MAX_FEE &&
-    standardFeeHigh > 0 &&
-    standardFeeLow < MAX_FEE
-  ) {
-    const out: BitcoinFees = bitcoinFees
+  const out = {}
+  if (highFee !== MAX_FEE) out.highFee = highFee.toFixed(0)
+  if (lowFee !== MAX_FEE) out.lowFee = lowFee.toFixed(0)
+  if (standardFeeHigh !== 0) out.standardHighFee.toFixed(0)
+  if (standardFeeLow !== MAX_FEE) out.standardFeeLow.toFixed(0)
 
-    // Overwrite the fees with those from earn.com
-    out.lowFee = lowFee.toFixed(0)
-    out.standardFeeLow = standardFeeLow.toFixed(0)
-    out.standardFeeHigh = standardFeeHigh.toFixed(0)
-    out.highFee = highFee.toFixed(0)
-
-    return out
-  } else {
-    return bitcoinFees
-  }
+  // Overwrite the fees with those from earn.com
+  return out
 }
 
 /**

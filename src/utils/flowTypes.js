@@ -19,20 +19,27 @@
 //   tokenTransaction: string
 // }
 //
+
+export type SatPerByte = string
+
+export type Satoshi = string
+
 export type BitcoinFees = {
-  lowFee: string,
-  standardFeeLow: string,
-  standardFeeHigh: string,
+  // SatPerByte priority is vendor server, then Edge, then default
+  lowFee: SatPerByte, // satoshi per byte
+  standardFeeLow: SatPerByte, // satoshi per byte
+  standardFeeHigh: SatPerByte,
+  highFee: SatPerByte,
+  // first 4 from manipulating Earn.com data
 
+  // The last time the fees were updated, comes when fetching
+  timestamp: number,
+
+  // from info servers, priority is Edge then default (no vendor)
   // The amount of satoshis which will be charged the standardFeeLow
-  standardFeeLowAmount: string,
-
+  standardFeeLowAmount: Satoshi,
   // The amount of satoshis which will be charged the standardFeeHigh
-  standardFeeHighAmount: string,
-  highFee: string,
-
-  // The last time the fees were updated
-  timestamp: number
+  standardFeeHighAmount: Satoshi
 }
 
 export type EarnComFee = {
