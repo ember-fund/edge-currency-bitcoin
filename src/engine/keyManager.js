@@ -180,7 +180,16 @@ export class KeyManager {
     await this.load()
   }
 
-  getReceiveAddress (): string {
+  getReceiveAddress (options): string {
+    const branch = options ? options.branch : null;
+    const index = options ? options.index : null;
+    if (typeof branch !== 'undefined' && typeof index !== 'undefined') {
+      const keysFiltered = this.keys.receive.children.filter(key => key.branch === branch && key.index === index);
+      if (!keysFiltered.length === 0) {
+        throw new Error(`No address found for branch ${branch} and index ${index}`);
+      }
+      return keysFiltered[0].displayAddress;
+    }
     return this.getNextAvailable(this.keys.receive.children)
   }
 

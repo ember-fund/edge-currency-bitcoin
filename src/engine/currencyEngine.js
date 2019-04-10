@@ -40,7 +40,8 @@ import {
   verifyTxAmount,
   sumUtxos,
   sumTransaction,
-  getReceiveAddresses
+  getReceiveAddresses,
+  parseTransaction
 } from '../utils/coinUtils.js'
 import {
   toLegacyFormat,
@@ -416,7 +417,7 @@ export class CurrencyEngine {
   }
 
   getFreshAddress (options: any): EdgeFreshAddress {
-    const publicAddress = this.keyManager.getReceiveAddress()
+    const publicAddress = this.keyManager.getReceiveAddress(options)
     const legacyAddress = toLegacyFormat(publicAddress, this.network)
     return { publicAddress, legacyAddress }
   }
@@ -517,13 +518,17 @@ export class CurrencyEngine {
   }
 
   async makeSpend (
-    edgeSpendInfo: EdgeSpendInfo,
-    txOptions?: TxOptions = {}
+    edgeSpendInfo: EdgeSpendInfo
   ): Promise<EdgeTransaction> {
-    const { spendTargets } = edgeSpendInfo
+    const { spendTargets, txOptions = {} } = edgeSpendInfo
     // Can't spend without outputs
     if (!txOptions.CPFP && (!spendTargets || spendTargets.length < 1)) {
       throw new Error('Need to provide Spend Targets')
+    }
+    if(txOptions.utxos) {
+        txOptions.utxos.forEach((utxo) => {
+          utxo.tx = parseTransaction(utxo.tx);
+        });
     }
     // Calculate the total amount to send
     const totalAmountToSend = spendTargets.reduce(
@@ -592,6 +597,13 @@ export class CurrencyEngine {
         networkFee: `${bcoinTx.getFee()}`,
         signedTx: ''
       }
+
+      if(txOptions.utxos) {
+          txOptions.utxos.forEach((utxo) => {
+            this.engineState.parsedTxs[utxo.txid] = utxo.tx;
+          });
+      }
+
       return edgeTransaction
     } catch (e) {
       if (e.type === 'FundingError') throw new Error('InsufficientFundsError')
