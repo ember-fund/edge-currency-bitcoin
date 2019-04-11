@@ -321,7 +321,12 @@ export class EngineState extends EventEmitter {
     this.onAddressesChecked(this.progressRatio)
     this.engineStarted = true
     this.pluginState.addEngine(this)
-    this.refillServers()
+    if (
+      this.pluginState.defaultSettings &&
+      !this.pluginState.defaultSettings.disableFetchingServers
+    ) {
+      this.refillServers()
+    }
   }
 
   async disconnect () {
@@ -463,7 +468,12 @@ export class EngineState extends EventEmitter {
         if (this.reconnectCounter < 30) this.reconnectCounter++
         this.reconnectTimer = setTimeout(() => {
           clearTimeout(this.reconnectTimer)
-          this.refillServers()
+          if (
+            this.pluginState.defaultSettings &&
+            !this.pluginState.defaultSettings.disableFetchingServers
+          ) {
+            this.refillServers()
+          }
         }, this.reconnectCounter * 1000)
       } else {
       }

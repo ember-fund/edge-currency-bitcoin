@@ -23,7 +23,6 @@ import { KeyManager } from './keyManager'
 import type { EngineStateCallbacks } from './engineState.js'
 import type { KeyManagerCallbacks } from './keyManager'
 import type { EarnComFees, BitcoinFees } from '../utils/flowTypes.js'
-import type { TxOptions } from '../utils/coinUtils.js'
 import { validateObject, promiseAny } from '../utils/utils.js'
 import {
   getPaymentDetails,
@@ -517,18 +516,16 @@ export class CurrencyEngine {
     }
   }
 
-  async makeSpend (
-    edgeSpendInfo: EdgeSpendInfo
-  ): Promise<EdgeTransaction> {
+  async makeSpend (edgeSpendInfo: EdgeSpendInfo): Promise<EdgeTransaction> {
     const { spendTargets, txOptions = {} } = edgeSpendInfo
     // Can't spend without outputs
     if (!txOptions.CPFP && (!spendTargets || spendTargets.length < 1)) {
       throw new Error('Need to provide Spend Targets')
     }
-    if(txOptions.utxos) {
-        txOptions.utxos.forEach((utxo) => {
-          utxo.tx = parseTransaction(utxo.tx);
-        });
+    if (txOptions.utxos) {
+      txOptions.utxos.forEach(utxo => {
+        utxo.tx = parseTransaction(utxo.tx)
+      })
     }
     // Calculate the total amount to send
     const totalAmountToSend = spendTargets.reduce(
@@ -543,7 +540,10 @@ export class CurrencyEngine {
     }
     try {
       // If somehow we have outdated fees, try and get new ones
-      if (Date.now() - this.fees.timestamp > this.feeUpdateInterval) {
+      if (
+        Date.now() - this.fees.timestamp > this.feeUpdateInterval &&
+        edgeSpendInfo.networkFeeOption !== 'custom'
+      ) {
         await this.updateFeeTable()
       }
       // Get the rate according to the latest fee
@@ -598,10 +598,10 @@ export class CurrencyEngine {
         signedTx: ''
       }
 
-      if(txOptions.utxos) {
-          txOptions.utxos.forEach((utxo) => {
-            this.engineState.parsedTxs[utxo.txid] = utxo.tx;
-          });
+      if (txOptions.utxos) {
+        txOptions.utxos.forEach(utxo => {
+          this.engineState.parsedTxs[utxo.txid] = utxo.tx
+        })
       }
 
       return edgeTransaction

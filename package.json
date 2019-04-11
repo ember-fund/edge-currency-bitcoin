@@ -22,13 +22,12 @@
     "url": "git@github.com:Airbitz/edge-currency-bitcoin.git"
   },
   "scripts": {
-    "build": "rollup -c && flow-copy-source src lib && npm run build:flow",
+    "build": "rollup -c && flow-copy-source src lib",
     "build:flow": "flow-copy-source -i '**/*.test.js' src lib",
     "build:test": "rollup -c rollup.config.test.js",
     "precommit": "lint-staged && npm test && npm run build",
-    "flow": "flow status",
     "format": "prettier-eslint --write '*.js' 'src/**/*.js' 'test/**/*.js'",
-    "lint": "eslint '*.js' 'src/**/*.js' 'test/**/*.js' && npm run flow",
+    "lint": "eslint '*.js' 'src/**/*.js' 'test/**/*.js'",
     "prepare": "npm run build",
     "security": "yarn audit",
     "pretest": "npm run build:test && npm run lint",

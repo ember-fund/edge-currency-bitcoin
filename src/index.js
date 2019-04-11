@@ -20,6 +20,13 @@ import { eboost } from './info/eboost'
 import { bitcoinsv } from './info/bitcoinsv'
 import { groestlcoin } from './info/groestlcoin'
 
+import { addressToScriptHash as addressToScriptHashFunction } from './utils/coinUtils.js'
+
+// Custom exports
+export const bitcoinCurrencySettings = bitcoin
+export const makeCurrencyPluginFactoryCustom = makeCurrencyPluginFactory
+export const addressToScriptHash = addressToScriptHashFunction
+
 export const bitcoinCurrencyPluginFactory = makeCurrencyPluginFactory(bitcoin)
 export const bitcoinTestnetCurrencyPluginFactory = makeCurrencyPluginFactory(
   bitcoinTestnet

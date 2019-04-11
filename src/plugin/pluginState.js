@@ -77,6 +77,8 @@ export class PluginState extends ServerCache {
   serverCacheJson: Object
   pluginName: string
 
+  defaultSettings: any
+
   constructor ({
     io,
     defaultSettings,
@@ -87,6 +89,7 @@ export class PluginState extends ServerCache {
     this.height = 0
     this.headerCache = {}
     this.io = io
+    this.defaultSettings = defaultSettings
     this.defaultServers = defaultSettings.electrumServers
     this.disableFetchingServers = !!defaultSettings.disableFetchingServers
     // Rename the bitcoin currencyCode to get the new version of the server list
@@ -227,8 +230,10 @@ export class PluginState extends ServerCache {
     await this.saveServerCache()
 
     // Tell the engines about the new servers:
-    for (const engine of this.engines) {
-      engine.refillServers()
+    if (!this.disableFetchingServers) {
+      for (const engine of this.engines) {
+        engine.refillServers()
+      }
     }
   }
 
