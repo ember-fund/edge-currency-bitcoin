@@ -6,6 +6,8 @@ import { parse } from 'uri-js'
 import { fetchPing, fetchVersion } from './stratumMessages.js'
 import type { StratumBlockHeader } from './stratumMessages.js'
 
+import { pushUpdate, removeIdFromQueue } from '../utils/updateQueue.js'
+
 export type OnFailHandler = (error: Error) => void
 
 // Timing can vary a little in either direction for fewer wake ups:
@@ -60,7 +62,7 @@ export class StratumConnection {
     const {
       callbacks,
       io,
-      queueSize = 10,
+      queueSize = 5,
       timeout = 30,
       walletId = ''
     } = options
@@ -121,14 +123,25 @@ export class StratumConnection {
     this.cancelConnect = false
   }
 
+  wakeUp () {
+    pushUpdate({
+      id: this.walletId + '==' + this.uri,
+      updateFunc: () => {
+        this.doWakeUp()
+      }
+    })
+  }
+
   /**
    * Re-triggers the `onQueueSpace` callback if there is space in the queue.
    */
-  wakeUp () {
-    while (Object.keys(this.pendingMessages).length < this.queueSize) {
-      const task = this.callbacks.onQueueSpace()
-      if (!task) break
-      this.submitTask(task)
+  doWakeUp () {
+    if (this.connected) {
+      while (Object.keys(this.pendingMessages).length < this.queueSize) {
+        const task = this.callbacks.onQueueSpace()
+        if (!task) break
+        this.submitTask(task)
+      }
     }
   }
 
@@ -164,6 +177,7 @@ export class StratumConnection {
     this.sigkill = true
     this.connected = false
     if (this.socket) this.socket.destroy(this.error)
+    removeIdFromQueue(this.uri)
   }
 
   // ------------------------------------------------------------------------

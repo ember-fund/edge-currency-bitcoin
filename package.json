@@ -25,14 +25,21 @@
     "build": "rollup -c && flow-copy-source src lib && npm run build:flow",
     "build:flow": "flow-copy-source -i '**/*.test.js' src lib",
     "build:test": "rollup -c rollup.config.test.js",
-    "precommit": "lint-staged && npm test && npm run build",
+    "precommit": "npm test && npm run build",
     "flow": "flow status",
+    "format": "prettier-eslint --write '*.js' 'src/**/*.js' 'test/**/*.js'",
+    "lint": "eslint '*.js' 'src/**/*.js' 'test/**/*.js' && npm run flow",
     "prepare": "npm run build",
     "security": "yarn audit",
     "pretest": "npm run build:test && npm run lint",
     "test": "nyc mocha --inspect --require source-map-support/register build/tests.cjs.js --reporter mocha-multi-reporters --reporter-options configFile=./mocha-config.json",
     "posttest": "nyc report --reporter=cobertura --reporter=html",
     "updot": "updot"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "npm run precommit"
+    }
   },
   "dependencies": {
     "bcoin": "git+https://github.com/Airbitz/bcoin.git#primitiveBuild",
