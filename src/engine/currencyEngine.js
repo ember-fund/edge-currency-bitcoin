@@ -362,7 +362,7 @@ export class CurrencyEngine {
   // ------------------------------------------------------------------------
   async startEngine (): Promise<void> {
     this.callbacks.onBalanceChanged(this.currencyCode, this.getBalance())
-    this.updateFeeFromEdge().then(this.updateFeeFromVendor)
+    this.updateFeeFromEdge().then(() => this.updateFeeFromVendor())
     return this.engineState.connect()
   }
 
