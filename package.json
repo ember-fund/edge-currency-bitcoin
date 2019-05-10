@@ -28,7 +28,7 @@
     "precommit": "npm test && npm run build",
     "flow": "flow status",
     "format": "prettier-eslint --write '*.js' 'src/**/*.js' 'test/**/*.js'",
-    "lint": "eslint '*.js' 'src/**/*.js' 'test/**/*.js' && npm run flow",
+    "lint": "npm run flow",
     "prepare": "npm run build",
     "security": "yarn audit",
     "pretest": "npm run build:test && npm run lint",

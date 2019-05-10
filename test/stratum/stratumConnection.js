@@ -43,7 +43,7 @@ describe('StratumConnection', function () {
         expect(parseFloat(version)).to.be.at.least(1.1)
         gotReply = true
       },
-      onNotifyHeader () {},
+      onNotifyHeight () {},
       onNotifyScriptHash () {},
       onOpen () {},
       onClose () {
@@ -72,7 +72,7 @@ describe('StratumConnection', function () {
     const callbacks: StratumCallbacks = {
       onTimer () {},
       onVersion (version) {},
-      onNotifyHeader () {},
+      onNotifyHeight () {},
       onNotifyScriptHash () {},
       onOpen () {},
       onClose () {
@@ -110,7 +110,7 @@ describe('StratumConnection', function () {
     const callbacks: StratumCallbacks = {
       onTimer () {},
       onVersion (version) {},
-      onNotifyHeader () {},
+      onNotifyHeight () {},
       onNotifyScriptHash () {},
       onOpen () {},
       onClose () {
@@ -146,7 +146,7 @@ describe('StratumConnection', function () {
     const callbacks: StratumCallbacks = {
       onTimer () {},
       onVersion (version) {},
-      onNotifyHeader () {},
+      onNotifyHeight () {},
       onNotifyScriptHash () {},
       onOpen () {},
       onClose () {
@@ -183,7 +183,7 @@ describe('StratumConnection', function () {
     const callbacks: StratumCallbacks = {
       onTimer () {},
       onVersion (version) {},
-      onNotifyHeader () {},
+      onNotifyHeight () {},
       onNotifyScriptHash () {},
       onOpen () {},
       onClose () {
@@ -222,7 +222,7 @@ describe('StratumConnection', function () {
     const callbacks: StratumCallbacks = {
       onTimer () {},
       onVersion (version) {},
-      onNotifyHeader () {},
+      onNotifyHeight () {},
       onNotifyScriptHash () {},
       onOpen () {},
       onClose () {
@@ -263,7 +263,7 @@ describe('StratumConnection', function () {
     const callbacks: StratumCallbacks = {
       onTimer () {},
       onVersion () {},
-      onNotifyHeader () {},
+      onNotifyHeight () {},
       onNotifyScriptHash () {},
       onOpen () {},
       onClose () {

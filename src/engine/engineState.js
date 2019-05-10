@@ -596,10 +596,10 @@ export class EngineState extends EventEmitter {
           console.log(`${prefix}received version ${version}`)
           this.pluginState.serverScoreUp(uri, requestMs)
         },
-        onNotifyHeader: (headerInfo: StratumBlockHeader) => {
-          console.log(`${prefix} returned height: ${headerInfo.block_height}`)
-          this.serverStates[uri].height = headerInfo.block_height
-          this.pluginState.updateHeight(headerInfo.block_height)
+        onNotifyHeight: (height: number) => {
+          console.log(`${prefix} returned height: ${height}`)
+          this.serverStates[uri].height = height
+          this.pluginState.updateHeight(height)
         },
 
         onNotifyScriptHash: (scriptHash: string, hash: string) => {
