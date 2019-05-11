@@ -26,8 +26,12 @@ import type {
   StratumHistoryRow,
   StratumUtxo
 } from '../stratum/stratumMessages.js'
-import { parseTransaction } from '../utils/coinUtils.js'
+import {
+  bitcoinTimestampFromHeader,
+  parseTransaction
+} from '../utils/coinUtils.js'
 import { pushUpdate, removeIdFromQueue } from '../utils/updateQueue.js'
+import { type EngineCurrencyInfo } from './currencyEngine.js'
 import { parse } from 'uri-js'
 
 export type UtxoInfo = {
@@ -90,6 +94,7 @@ export interface EngineStateOptions {
   encryptedLocalFolder: any;
   pluginState: PluginState;
   walletId?: string;
+  engineInfo: EngineCurrencyInfo;
 }
 
 function nop () {}
@@ -395,6 +400,7 @@ export class EngineState extends EventEmitter {
   localFolder: DiskletFolder
   encryptedLocalFolder: DiskletFolder
   pluginState: PluginState
+  engineInfo: EngineCurrencyInfo
   onBalanceChanged: () => void
   onAddressUsed: () => void
   onHeightUpdated: (height: number) => void
@@ -432,6 +438,7 @@ export class EngineState extends EventEmitter {
     this.encryptedLocalFolder = options.encryptedLocalFolder
     this.pluginState = options.pluginState
     this.serverList = []
+    this.engineInfo = options.engineInfo
     const {
       onBalanceChanged = nop,
       onAddressUsed = nop,
@@ -661,8 +668,12 @@ export class EngineState extends EventEmitter {
         const queryTime = Date.now()
         return fetchBlockHeader(
           parseInt(height),
+          this.engineInfo.timestampFromHeader || bitcoinTimestampFromHeader,
           (header: StratumBlockHeader) => {
-            console.log(`${prefix} received header for block number ${height}`)
+            const prettyDate = new Date(header.timestamp * 1000).toISOString()
+            console.log(
+              `${prefix} received header for block number ${height} @ ${prettyDate}`
+            )
             this.fetchingHeaders[height] = false
             this.pluginState.serverScoreUp(uri, Date.now() - queryTime)
             this.handleHeaderFetch(height, header)
@@ -678,7 +689,8 @@ export class EngineState extends EventEmitter {
             } else {
               // TODO: Don't penalize the server score either.
             }
-          }
+          },
+          stratumVersion
         )
       }
     }

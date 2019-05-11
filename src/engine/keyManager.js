@@ -69,9 +69,9 @@ export interface KeyManagerCallbacks {
     address: string,
     path: string,
     redeemScript?: string
-  ) => void;
+  ) => mixed;
   // When deriving new key send it to caching
-  +onNewKey?: (keys: any) => void;
+  +onNewKey?: (keys: any) => mixed;
 }
 
 export type KeyManagerOptions = {
@@ -102,8 +102,8 @@ export class KeyManager {
     address: string,
     path: string,
     redeemScript?: string
-  ) => void
-  onNewKey: (keys: any) => void
+  ) => mixed
+  onNewKey: (keys: any) => mixed
   addressInfos: AddressInfos
   scriptHashes: { [displayAddress: string]: string }
   txInfos: { [txid: string]: any }
