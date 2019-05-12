@@ -2,7 +2,6 @@
 import { parse } from 'uri-js'
 
 import { fetchPing, fetchVersion } from './stratumMessages.js'
-import type { StratumBlockHeader } from './stratumMessages.js'
 
 export type OnFailHandler = (error: Error) => void
 
@@ -24,8 +23,8 @@ export interface StratumTask {
 export interface StratumCallbacks {
   +onOpen: () => void;
   +onClose: (error?: Error) => void;
-  +onQueueSpace: () => StratumTask | void;
-  +onNotifyHeader: (headerInfo: StratumBlockHeader) => void;
+  +onQueueSpace: (stratumVersion: string) => StratumTask | void;
+  +onNotifyHeight: (height: number) => void;
   +onNotifyScriptHash: (scriptHash: string, hash: string) => void;
   +onTimer: (queryTime: number) => void;
   +onVersion: (version: string, requestMs: number) => void;
@@ -124,10 +123,13 @@ export class StratumConnection {
    * Re-triggers the `onQueueSpace` callback if there is space in the queue.
    */
   wakeUp () {
-    while (Object.keys(this.pendingMessages).length < this.queueSize) {
-      const task = this.callbacks.onQueueSpace()
-      if (!task) break
-      this.submitTask(task)
+    const { connected, version } = this
+    if (connected && version != null) {
+      while (Object.keys(this.pendingMessages).length < this.queueSize) {
+        const task = this.callbacks.onQueueSpace(version)
+        if (!task) break
+        this.submitTask(task)
+      }
     }
   }
 
@@ -269,7 +271,17 @@ export class StratumConnection {
       } else if (json.method === 'blockchain.headers.subscribe') {
         try {
           // TODO: Validate
-          this.callbacks.onNotifyHeader(json.params[0])
+          if (json.params == null || json.params[0] == null) {
+            throw new Error(`Bad Stratum reply ${messageJson}`)
+          }
+          const reply = json.params[0]
+          if (typeof reply.height === 'number') {
+            this.callbacks.onNotifyHeight(reply.height)
+          } else if (typeof reply.block_height === 'number') {
+            this.callbacks.onNotifyHeight(reply.block_height)
+          } else {
+            throw new Error(`Bad Stratum reply ${messageJson}`)
+          }
         } catch (e) {
           console.log(this.errStr(e))
         }

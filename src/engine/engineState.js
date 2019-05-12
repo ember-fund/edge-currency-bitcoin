@@ -9,6 +9,7 @@ import type {
   StratumCallbacks,
   StratumTask
 } from '../stratum/stratumConnection.js'
+import { type EngineCurrencyInfo } from './currencyEngine.js'
 import EventEmitter from 'eventemitter3'
 import stable from 'stable'
 import { StratumConnection } from '../stratum/stratumConnection.js'
@@ -26,7 +27,10 @@ import type {
   StratumHistoryRow,
   StratumUtxo
 } from '../stratum/stratumMessages.js'
-import { parseTransaction } from '../utils/coinUtils.js'
+import {
+  bitcoinTimestampFromHeader,
+  parseTransaction
+} from '../utils/coinUtils.js'
 import { parse } from 'uri-js'
 
 export type UtxoInfo = {
@@ -89,6 +93,7 @@ export interface EngineStateOptions {
   encryptedLocalFolder: any;
   pluginState: PluginState;
   walletId?: string;
+  engineInfo: EngineCurrencyInfo;
 }
 
 function nop () {}
@@ -413,6 +418,7 @@ export class EngineState extends EventEmitter {
   progressRatio: number
   txCacheInitSize: number
   serverList: Array<string>
+  engineInfo: EngineCurrencyInfo
 
   constructor (options: EngineStateOptions) {
     super()
@@ -437,6 +443,7 @@ export class EngineState extends EventEmitter {
     this.encryptedLocalFolder = options.encryptedLocalFolder
     this.pluginState = options.pluginState
     this.serverList = []
+    this.engineInfo = options.engineInfo
     const {
       onBalanceChanged = nop,
       onAddressUsed = nop,
@@ -518,7 +525,6 @@ export class EngineState extends EventEmitter {
     const ignorePatterns = []
     // if (!this.io.TLSSocket)
     ignorePatterns.push('electrums:')
-    if (!this.io.Socket) ignorePatterns.push('electrum:')
     if (this.serverList.length === 0) {
       this.serverList = this.pluginState.getServers(
         NEW_CONNECTIONS,
@@ -526,9 +532,7 @@ export class EngineState extends EventEmitter {
       )
     }
     console.log(
-      `${
-        this.walletId
-      } - Refilling Servers, top ${NEW_CONNECTIONS} servers are:`,
+      `${this.walletId} : refillServers: Top ${NEW_CONNECTIONS} servers:`,
       this.serverList
     )
     let chanceToBePicked = 1.25
@@ -557,53 +561,53 @@ export class EngineState extends EventEmitter {
         this.reconnect()
         break
       }
-      const prefix = `${this.walletId} - Stratum ${uri} `
+      const prefix = `${this.walletId} ${uri.replace('electrum://', '')}:`
       const callbacks: StratumCallbacks = {
         onOpen: () => {
           this.reconnectCounter = 0
-          console.log(`${this.walletId} - Connected to ${uri}`)
+          console.log(`${prefix} ** Connected **`)
         },
         onClose: (error?: Error) => {
           delete this.connections[uri]
-          const msg = error ? ` with error ${error.message}` : ''
-          console.log(`${prefix}was closed${msg}`)
+          const msg = error ? ` !! Connection ERROR !! ${error.message}` : ''
+          console.log(`${prefix} onClose ${msg}`)
           this.emit('connectionClose', uri)
-          error && this.pluginState.serverScoreDown(uri)
+          if (error != null) {
+            if (/Bad Stratum version/.test(error.message)) {
+              this.pluginState.serverScoreDown(uri, 100)
+            } else this.pluginState.serverScoreDown(uri)
+          }
           this.reconnect()
           this.saveAddressCache()
           this.saveTxCache()
         },
 
-        onQueueSpace: () => {
-          const start = Date.now()
-          const task = this.pickNextTask(uri)
-          const taskMessage = task
-            ? `${task.method} with params: ${task.params.toString()}`
-            : 'No task Has been Picked'
-          console.log(
-            `${
-              this.walletId
-            } - Picked task: ${taskMessage}, for uri ${uri}, in: - ${Date.now() -
-              start}ms`
-          )
+        onQueueSpace: (stratumVersion: string) => {
+          const task = this.pickNextTask(uri, stratumVersion)
+          if (task) {
+            const taskMessage = task
+              ? `${task.method} params: ${task.params.toString()}`
+              : 'no task'
+            console.log(`${prefix} nextTask: ${taskMessage}`)
+          }
           return task
         },
         onTimer: (queryTime: number) => {
-          console.log(`${prefix}was pinged`)
+          console.log(`${prefix} returned version in ${queryTime}ms`)
           this.pluginState.serverScoreUp(uri, Date.now() - queryTime)
         },
         onVersion: (version: string, requestMs) => {
           console.log(`${prefix}received version ${version}`)
           this.pluginState.serverScoreUp(uri, requestMs)
         },
-        onNotifyHeader: (headerInfo: StratumBlockHeader) => {
-          console.log(`${prefix}notified header ${headerInfo.block_height}`)
-          this.serverStates[uri].height = headerInfo.block_height
-          this.pluginState.updateHeight(headerInfo.block_height)
+        onNotifyHeight: (height: number) => {
+          console.log(`${prefix} returned height: ${height}`)
+          this.serverStates[uri].height = height
+          this.pluginState.updateHeight(height)
         },
 
         onNotifyScriptHash: (scriptHash: string, hash: string) => {
-          console.log(`${prefix}notified scripthash ${scriptHash} change`)
+          console.log(`${prefix} notified scripthash change: ${scriptHash}`)
           const addressState = this.serverStates[uri].addresses[scriptHash]
           addressState.hash = hash
           addressState.lastUpdate = Date.now()
@@ -627,9 +631,8 @@ export class EngineState extends EventEmitter {
     }
   }
 
-  pickNextTask (uri: string): StratumTask | void {
+  pickNextTask (uri: string, stratumVersion: string): StratumTask | void {
     const serverState = this.serverStates[uri]
-    const connection = this.connections[uri]
     const prefix = `${this.walletId} - Stratum ${uri} `
 
     // Subscribe to height if this has never happened:
@@ -651,18 +654,6 @@ export class EngineState extends EventEmitter {
       )
     }
 
-    // If this server is too old, bail out!
-    // TODO: Stop checking the height in the Stratum message creator.
-    // TODO: Check block headers to ensure we are on the right chain.
-    if (connection.version == null) return
-    if (connection.version < '1.1') {
-      this.connections[uri].close(
-        new Error('Server protocol version is too old')
-      )
-      this.pluginState.serverScoreDown(uri, 100)
-      return
-    }
-
     // Fetch Headers:
     for (const height of Object.keys(this.missingHeaders)) {
       if (
@@ -673,8 +664,12 @@ export class EngineState extends EventEmitter {
         const queryTime = Date.now()
         return fetchBlockHeader(
           parseInt(height),
-          (header: any) => {
-            console.log(`${prefix}received header for block number ${height}`)
+          this.engineInfo.timestampFromHeader || bitcoinTimestampFromHeader,
+          (header: StratumBlockHeader) => {
+            const prettyDate = new Date(header.timestamp * 1000).toISOString()
+            console.log(
+              `${prefix} received header for block number ${height} @ ${prettyDate}`
+            )
             this.fetchingHeaders[height] = false
             this.pluginState.serverScoreUp(uri, Date.now() - queryTime)
             this.handleHeaderFetch(height, header)
@@ -690,7 +685,8 @@ export class EngineState extends EventEmitter {
             } else {
               // TODO: Don't penalize the server score either.
             }
-          }
+          },
+          stratumVersion
         )
       }
     }
@@ -998,7 +994,7 @@ export class EngineState extends EventEmitter {
   }
 
   // A server has sent a header, so update the cache and txs:
-  handleHeaderFetch (height: string, header: any) {
+  handleHeaderFetch (height: string, header: StratumBlockHeader) {
     if (!this.pluginState.headerCache[height]) {
       this.pluginState.headerCache[height] = header
       const affectedTXIDS = this.findAffectedTransactions(height)

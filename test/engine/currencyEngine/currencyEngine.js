@@ -301,7 +301,7 @@ for (const dir of dirs(FIXTURES_FOLDER)) {
   describe('Should start engine', function () {
     it('Get BlockHeight', function (done) {
       const { uri, defaultHeight } = fixture.BlockHeight
-      this.timeout(10000)
+      this.timeout(3000)
       const testHeight = () => {
         emitter.on('onBlockHeightChange', height => {
           if (height >= heightExpected) {
@@ -359,7 +359,7 @@ for (const dir of dirs(FIXTURES_FOLDER)) {
 
   describe(`Get Fresh Address for Wallet type ${WALLET_TYPE}`, function () {
     it('Should provide a non used BTC address when no options are provided', function (done) {
-      this.timeout(10000)
+      this.timeout(3000)
       const { uri } = fixture.FreshAddress
       setTimeout(() => {
         const address = engine.getFreshAddress() // TODO
@@ -413,7 +413,7 @@ for (const dir of dirs(FIXTURES_FOLDER)) {
 
     Object.keys(spendTests).forEach(test => {
       it(`Should build transaction with ${test}`, function () {
-        this.timeout(10000)
+        this.timeout(3000)
         const templateSpend = spendTests[test]
         return engine
           .makeSpend(templateSpend)
@@ -441,7 +441,7 @@ for (const dir of dirs(FIXTURES_FOLDER)) {
 
     Object.keys(sweepTests).forEach(test => {
       it(`Should build transaction with ${test}`, function () {
-        this.timeout(10000)
+        this.timeout(3000)
         const templateSpend = sweepTests[test]
         return engine
           .sweepPrivateKeys(templateSpend)

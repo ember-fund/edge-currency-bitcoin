@@ -1,8 +1,12 @@
 // @flow
+// $FlowFixMe
+import buffer from 'buffer-hack'
 import type { EdgeCurrencyInfo } from 'edge-core-js'
 import type { EngineCurrencyInfo } from '../engine/currencyEngine.js'
 import type { BcoinCurrencyInfo } from '../utils/bcoinExtender/bcoinExtender.js'
 import { imageServerUrl } from './constants.js'
+
+const { Buffer } = buffer
 
 const bcoinInfo: BcoinCurrencyInfo = {
   type: 'zcoin',
@@ -37,6 +41,12 @@ const engineInfo: EngineCurrencyInfo = {
     standardFeeHigh: '100',
     standardFeeLowAmount: '173200',
     standardFeeHighAmount: '8670000'
+  },
+  timestampFromHeader (header: Buffer): number {
+    if (header.length < 80) {
+      throw new Error(`Cannot interpret block header ${header.toString('hex')}`)
+    }
+    return header.readUInt32LE(4 + 32 + 32)
   }
 }
 
