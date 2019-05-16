@@ -287,7 +287,7 @@ export class CurrencyEngine {
         }
         const feesJson: EarnComFees = await results.json()
         if (validateObject(feesJson, EarnComFeesSchema)) {
-          const newFees = calcFeesFromEarnCom(feesJson.fees)
+          const newFees = calcFeesFromEarnCom(feesJson)
           this.fees = { ...this.fees, ...newFees }
           this.fees.timestamp = Date.now()
         } else {
