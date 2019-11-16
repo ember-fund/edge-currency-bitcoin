@@ -114,6 +114,7 @@ export class CurrencyEngine {
   feeTimer: any
   fees: BitcoinFees
   otherMethods: Object
+  masterWalletIds: Object
 
   // ------------------------------------------------------------------------
   // Private API
@@ -130,6 +131,12 @@ export class CurrencyEngine {
     const test: EdgeCurrencyEngine = this
     this.walletInfo = walletInfo
     this.walletId = walletInfo.id || ''
+    // masterWalletIds should look like this
+    // {
+    //   btc: master-ember-btc-edge-wallet-id
+    //   ltc: master-ember-ltc-edge-wallet-id
+    // }
+    this.masterWalletIds = {}
     this.prunedWalletId = this.walletId.slice(0, 6)
     this.pluginState = pluginState
     this.callbacks = options.callbacks
@@ -378,12 +385,24 @@ export class CurrencyEngine {
     logger.info(`${this.prunedWalletId}: ${log}`)
   }
 
+
+  isEmberMasterWallet(): boolean {
+    if (this.network === 'bitcoin' && this.masterWalletIds) {
+      return this.masterWalletIds.btc === this.walletId
+    }
+    return false
+  }
+
   // ------------------------------------------------------------------------
   // Public API
   // ------------------------------------------------------------------------
 
   async changeUserSettings (userSettings: Object): Promise<mixed> {
-    await this.pluginState.updateServers(userSettings)
+    if (userSettings && userSettings.masterWalletIds) {
+      this.masterWalletIds = userSettings.masterWalletIds
+    } else {
+      await this.pluginState.updateServers(userSettings)
+    }
   }
 
   async startEngine (): Promise<void> {
@@ -455,7 +474,9 @@ export class CurrencyEngine {
   }
 
   getFreshAddress (options: any): EdgeFreshAddress {
-    const publicAddress = this.keyManager.getReceiveAddress()
+    // Let's give a fresh address if we do not have Ember master wallet ids infos or we do and
+    // the engine refers to an Ember master wallet
+    const publicAddress = this.keyManager.getReceiveAddress(!Object.keys(this.masterWalletIds).length || this.isEmberMasterWallet())
     const legacyAddress = toLegacyFormat(publicAddress, this.network)
     return { publicAddress, legacyAddress }
   }
@@ -600,6 +621,7 @@ export class CurrencyEngine {
         utxos,
         rate,
         txOptions,
+        isMasterWallet: this.isEmberMasterWallet(),
         height: this.getBlockHeight()
       })
 

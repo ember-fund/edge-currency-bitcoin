@@ -59,7 +59,8 @@ export type createTxOptions = {
   utxos: Array<Utxo>,
   height: BlockHeight,
   rate: number,
-  txOptions: TxOptions
+  txOptions: TxOptions,
+  isMasterWallet?: boolean
 }
 
 export type SignMessage = {
@@ -207,13 +208,19 @@ export class KeyManager {
     await this.load()
   }
 
-  getReceiveAddress (): string {
-    return this.getNextAvailable(this.keys.receive.children)
+  getReceiveAddress (giveFreshAddress: boolean = true): string {
+    if (giveFreshAddress) {
+        return this.getNextAvailable(this.keys.receive.children)
+    }
+    return this.keys.receive.children[0].displayAddress
   }
 
-  getChangeAddress (): string {
+  getChangeAddress (giveFreshAddress: boolean = true): string {
     if (this.bip === 'bip32') return this.getReceiveAddress()
-    return this.getNextAvailable(this.keys.change.children)
+    if (giveFreshAddress) {
+      return this.getNextAvailable(this.keys.change.children)
+    }
+    return this.keys.change.children[0].displayAddress
   }
 
   async createTX (options: createTxOptions): any {
@@ -250,7 +257,7 @@ export class KeyManager {
     return createTX({
       ...rest,
       outputs: standardOutputs,
-      changeAddress: this.getChangeAddress(),
+      changeAddress: this.getChangeAddress(options.isMasterWallet),
       estimate: prev => this.fSelector.estimateSize(prev),
       network: this.network
     })
