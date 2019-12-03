@@ -32,7 +32,8 @@ import {
   signBitcoinMessage,
   sumTransaction,
   sumUtxos,
-  verifyTxAmount
+  verifyTxAmount,
+  parseTransaction
 } from '../utils/coinUtils.js'
 import type { BitcoinFees, EarnComFees } from '../utils/flowTypes.js'
 import { getAllAddresses } from '../utils/formatSelector.js'
@@ -579,6 +580,9 @@ export class CurrencyEngine {
     txOptions?: TxOptions = {}
   ): Promise<EdgeTransaction> {
     const { spendTargets } = edgeSpendInfo
+    if (JSON.stringify(txOptions) == '{}' && edgeSpendInfo.otherParams) {
+      txOptions = edgeSpendInfo.otherParams.txOptions
+    }
     // Can't spend without outputs
     if (!txOptions.CPFP && (!spendTargets || spendTargets.length < 1)) {
       throw new Error('Need to provide Spend Targets')
@@ -589,7 +593,20 @@ export class CurrencyEngine {
       '0'
     )
     // Try and get UTXOs from `txOptions`, if unsuccessful use our own utxo's
-    const { utxos = this.engineState.getUTXOs() } = txOptions
+    let utxos = null;
+    if (txOptions.utxos) {
+      // Deep copy the array of utxos so we don't mutate them in edgeSpendInfo
+      utxos = JSON.parse(JSON.stringify(txOptions.utxos))
+      // Parse tx if needed
+      utxos.forEach(utxo => {
+        if (typeof utxo.tx === 'string' || utxo.tx instanceof String) {
+            utxo.tx = parseTransaction(utxo.tx)
+        }
+      })
+    } else {
+      utxos = this.engineState.getUTXOs()
+    }
+
     // Test if we have enough to spend
     if (bns.gt(totalAmountToSend, `${sumUtxos(utxos)}`)) {
       throw new InsufficientFundsError()
@@ -622,19 +639,17 @@ export class CurrencyEngine {
       })
 
       const { scriptHashes } = this.engineState
-      const sumOfTx = spendTargets.reduce(
-        (s, { publicAddress, nativeAmount }: EdgeSpendTarget) =>
-          publicAddress && scriptHashes[publicAddress]
-            ? s
-            : s - parseInt(nativeAmount),
-        0
-      )
-
       const addresses = getReceiveAddresses(bcoinTx, this.network)
 
       const ourReceiveAddresses = addresses.filter(
         address => scriptHashes[address]
       )
+
+      let nativeAmount = bcoinTx.getOutputValue() - parseInt(bcoinTx.getFee())
+      // When using the subtractFee option, bcoin subtract evenly the network fee from the outputs
+      if (txOptions.subtractFee) {
+        nativeAmount = bcoinTx.getOutputValue()
+      }
 
       const edgeTransaction: EdgeTransaction = {
         ourReceiveAddresses,
@@ -647,10 +662,20 @@ export class CurrencyEngine {
         txid: '',
         date: 0,
         blockHeight: 0,
-        nativeAmount: `${sumOfTx - parseInt(bcoinTx.getFee())}`,
+        nativeAmount: `${nativeAmount}`,
         networkFee: `${bcoinTx.getFee()}`,
         signedTx: ''
       }
+
+      // Add utxos to cache
+      if (txOptions.utxos) {
+        utxos.forEach(utxo => {
+          this.engineState.parsedTxs[utxo.txid] = utxo.tx
+        })
+      }
+
+      debugger
+
       return edgeTransaction
     } catch (e) {
       if (e.type === 'FundingError') throw new Error('InsufficientFundsError')
