@@ -674,8 +674,6 @@ export class CurrencyEngine {
         })
       }
 
-      debugger
-
       return edgeTransaction
     } catch (e) {
       if (e.type === 'FundingError') throw new Error('InsufficientFundsError')
