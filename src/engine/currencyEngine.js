@@ -32,7 +32,8 @@ import {
   signBitcoinMessage,
   sumTransaction,
   sumUtxos,
-  verifyTxAmount
+  verifyTxAmount,
+  parseTransaction
 } from '../utils/coinUtils.js'
 import type { BitcoinFees, EarnComFees } from '../utils/flowTypes.js'
 import { getAllAddresses } from '../utils/formatSelector.js'
@@ -114,6 +115,7 @@ export class CurrencyEngine {
   feeTimer: any
   fees: BitcoinFees
   otherMethods: Object
+  masterWalletIds: Object
 
   // ------------------------------------------------------------------------
   // Private API
@@ -130,6 +132,12 @@ export class CurrencyEngine {
     const test: EdgeCurrencyEngine = this
     this.walletInfo = walletInfo
     this.walletId = walletInfo.id || ''
+    // masterWalletIds should look like this
+    // {
+    //   btc: master-ember-btc-edge-wallet-id
+    //   ltc: master-ember-ltc-edge-wallet-id
+    // }
+    this.masterWalletIds = {}
     this.prunedWalletId = this.walletId.slice(0, 6)
     this.pluginState = pluginState
     this.callbacks = options.callbacks
@@ -374,12 +382,24 @@ export class CurrencyEngine {
     logger.info(`${this.prunedWalletId}: ${log}`)
   }
 
+
+  isEmberMasterWallet(): boolean {
+    if (this.network === 'bitcoin' && this.masterWalletIds) {
+      return this.masterWalletIds.btc === this.walletId
+    }
+    return false
+  }
+
   // ------------------------------------------------------------------------
   // Public API
   // ------------------------------------------------------------------------
 
-  async changeUserSettings(userSettings: Object): Promise<mixed> {
-    await this.pluginState.updateServers(userSettings)
+  async changeUserSettings (userSettings: Object): Promise<mixed> {
+    if (userSettings && userSettings.masterWalletIds) {
+      this.masterWalletIds = userSettings.masterWalletIds
+    } else {
+      await this.pluginState.updateServers(userSettings)
+    }
   }
 
   async startEngine(): Promise<void> {
@@ -450,8 +470,10 @@ export class CurrencyEngine {
     return edgeTransactions.slice(startIndex, endIndex)
   }
 
-  getFreshAddress(options: any): EdgeFreshAddress {
-    const publicAddress = this.keyManager.getReceiveAddress()
+  getFreshAddress (options: any): EdgeFreshAddress {
+    // Let's give a fresh address if we do not have Ember master wallet ids infos or we do and
+    // the engine refers to an Ember master wallet
+    const publicAddress = this.keyManager.getReceiveAddress(!Object.keys(this.masterWalletIds).length || this.isEmberMasterWallet())
     const legacyAddress = toLegacyFormat(publicAddress, this.network)
     return { publicAddress, legacyAddress }
   }
@@ -558,6 +580,9 @@ export class CurrencyEngine {
     txOptions?: TxOptions = {}
   ): Promise<EdgeTransaction> {
     const { spendTargets } = edgeSpendInfo
+    if (JSON.stringify(txOptions) == '{}' && edgeSpendInfo.otherParams) {
+      txOptions = edgeSpendInfo.otherParams.txOptions
+    }
     // Can't spend without outputs
     if (!txOptions.CPFP && (!spendTargets || spendTargets.length < 1)) {
       throw new Error('Need to provide Spend Targets')
@@ -568,7 +593,20 @@ export class CurrencyEngine {
       '0'
     )
     // Try and get UTXOs from `txOptions`, if unsuccessful use our own utxo's
-    const { utxos = this.engineState.getUTXOs() } = txOptions
+    let utxos = null;
+    if (txOptions.utxos) {
+      // Deep copy the array of utxos so we don't mutate them in edgeSpendInfo
+      utxos = JSON.parse(JSON.stringify(txOptions.utxos))
+      // Parse tx if needed
+      utxos.forEach(utxo => {
+        if (typeof utxo.tx === 'string' || utxo.tx instanceof String) {
+            utxo.tx = parseTransaction(utxo.tx)
+        }
+      })
+    } else {
+      utxos = this.engineState.getUTXOs()
+    }
+
     // Test if we have enough to spend
     if (bns.gt(totalAmountToSend, `${sumUtxos(utxos)}`)) {
       throw new InsufficientFundsError()
@@ -596,23 +634,22 @@ export class CurrencyEngine {
         utxos,
         rate,
         txOptions,
+        isMasterWallet: this.isEmberMasterWallet(),
         height: this.getBlockHeight()
       })
 
       const { scriptHashes } = this.engineState
-      const sumOfTx = spendTargets.reduce(
-        (s, { publicAddress, nativeAmount }: EdgeSpendTarget) =>
-          publicAddress && scriptHashes[publicAddress]
-            ? s
-            : s - parseInt(nativeAmount),
-        0
-      )
-
       const addresses = getReceiveAddresses(bcoinTx, this.network)
 
       const ourReceiveAddresses = addresses.filter(
         address => scriptHashes[address]
       )
+
+      let nativeAmount = bcoinTx.getOutputValue() - parseInt(bcoinTx.getFee())
+      // When using the subtractFee option, bcoin subtract evenly the network fee from the outputs
+      if (txOptions.subtractFee) {
+        nativeAmount = bcoinTx.getOutputValue()
+      }
 
       const edgeTransaction: EdgeTransaction = {
         ourReceiveAddresses,
@@ -625,10 +662,18 @@ export class CurrencyEngine {
         txid: '',
         date: 0,
         blockHeight: 0,
-        nativeAmount: `${sumOfTx - parseInt(bcoinTx.getFee())}`,
+        nativeAmount: `${nativeAmount}`,
         networkFee: `${bcoinTx.getFee()}`,
         signedTx: ''
       }
+
+      // Add utxos to cache
+      if (txOptions.utxos) {
+        utxos.forEach(utxo => {
+          this.engineState.parsedTxs[utxo.txid] = utxo.tx
+        })
+      }
+
       return edgeTransaction
     } catch (e) {
       if (e.type === 'FundingError') throw new Error('InsufficientFundsError')
