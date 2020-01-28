@@ -32,6 +32,7 @@ import {
 } from '../utils/coinUtils.js'
 import { getXPubFromSeed } from '../utils/formatSelector.js'
 import { logger, setLogger } from '../utils/logger.js'
+import { checkCacheVersion } from '../utils/upgradeCache.js'
 import { type PluginIo } from './pluginIo.js'
 import { PluginState } from './pluginState.js'
 import { encodeUri, parseUri } from './uri.js'
@@ -163,6 +164,7 @@ const makeCurrencyPluginFactory = (
           options,
           io
         })
+        await checkCacheVersion(options, walletInfo, engineInfo)
         await engine.load()
         return engine
       },

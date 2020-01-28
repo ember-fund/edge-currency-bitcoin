@@ -1,5 +1,20 @@
 # edge-currency-bitcoin
 
+# 4.7.2 (2019-12-31)
+
+- Allow parsing BCH addresses that start with `bitcoincash:`
+
+# 4.7.1 (2019-12-17)
+
+- Add Badcoin
+- Automatically update the cache files for backwards compatability
+
+# 4.7.0 (2019-12-11)
+
+- Change BSV address format into standard Bitcoin base58 address
+- Change BSV URI prefix to `bitcoin:`
+- Remove `bitcoincash:` prefix from BCH addresses
+
 # 4.6.4 (2019-11-04)
 
 - Fix spending from accounts with large balances (>21 million).

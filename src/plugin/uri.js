@@ -1,5 +1,6 @@
 // @flow
 
+import { networks } from 'bcoin'
 import { bns } from 'biggystring'
 import {
   type EdgeCurrencyInfo,
@@ -9,12 +10,7 @@ import {
 import { serialize } from 'uri-js'
 import parse from 'url-parse'
 
-import {
-  dirtyAddress,
-  sanitizeAddress,
-  toNewFormat,
-  validAddress
-} from '../utils/addressFormat/addressFormatIndex.js'
+import { toNewFormat, validAddress } from '../utils/addressFormat.js'
 import { verifyUriProtocol, verifyWIF } from '../utils/coinUtils.js'
 
 // import bcoin from 'bcoin'
@@ -29,11 +25,9 @@ const parsePathname = (pathname: string, network: string) => {
   const parsedAddress = {}
   let address = pathname
   let legacyAddress = ''
-  address = dirtyAddress(address, network)
   if (validAddress(address, network)) {
     parsedAddress.publicAddress = address
   } else {
-    address = sanitizeAddress(address, network)
     legacyAddress = address
     address = toNewFormat(address, network)
     if (!validAddress(address, network)) {
@@ -98,17 +92,20 @@ export const encodeUri = (
   { pluginName, currencyCode, denominations }: EdgeCurrencyInfo
 ): string => {
   const { legacyAddress, publicAddress } = obj
-  let address = publicAddress
+  const { uriPrefix = '' } = networks[network] || {}
+  let address
+
   if (
     legacyAddress &&
     validAddress(toNewFormat(legacyAddress, network), network)
   ) {
     address = legacyAddress
   } else if (publicAddress && validAddress(publicAddress, network)) {
-    address = dirtyAddress(publicAddress, network)
+    address = publicAddress
   } else {
     throw new Error('InvalidPublicAddressError')
   }
+
   // $FlowFixMe
   if (!obj.nativeAmount && !obj.metadata) return address
   // $FlowFixMe
@@ -132,10 +129,9 @@ export const encodeUri = (
     }
   }
   queryString = queryString.substr(0, queryString.length - 1)
-
   return serialize({
-    scheme: pluginName.toLowerCase(),
-    path: sanitizeAddress(address, network),
+    scheme: uriPrefix || pluginName.toLowerCase(),
+    path: address,
     query: queryString
   })
 }

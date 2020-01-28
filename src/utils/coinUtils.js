@@ -12,10 +12,7 @@ import { Buffer } from 'buffer'
 
 import { type EngineState } from '../engine/engineState.js'
 import { logger } from '../utils/logger.js'
-import {
-  toLegacyFormat,
-  toNewFormat
-} from './addressFormat/addressFormatIndex.js'
+import { toNewFormat } from './addressFormat.js'
 import {
   hash256,
   hash256Sync,
@@ -129,7 +126,7 @@ export const verifyWIF = (data: any, network: string) => {
   const { serializers = {} } = networks[network] || {}
   if (serializers.wif) data = serializers.wif.decode(data)
   const br = new utils.BufferReader(base58.decode(data), true)
-  const version = br.readU8()
+  const version = br.readU8() // TODO make sure it can handle different version lengths
   network = Network.fromWIF(version, network)
   br.readBytes(32)
   if (br.left() > 4 && br.readU8() !== 1) {
@@ -144,10 +141,10 @@ export const verifyUriProtocol = (
   network: string,
   pluginName: string
 ) => {
-  const { addressPrefix = {} } = networks[network] || {}
+  const { uriPrefix = '' } = networks[network] || {}
   if (protocol) {
     const prot = protocol.replace(':', '').toLowerCase()
-    return prot === pluginName || prot === addressPrefix.cashAddress
+    return prot === pluginName || prot === uriPrefix
   }
   return true
 }
@@ -200,11 +197,11 @@ export const createTX = async ({
 }: CreateTxOptions) => {
   // Convert an address to the correct format that bcoin supports
   const toBcoinFormat = (address: string, network: string): string => {
-    const { addressPrefix = {}, serializers = {} } = networks[network] || {}
-    if (serializers.address) address = serializers.address.decode(address)
-    else if (addressPrefix.cashAddress) {
-      address = toLegacyFormat(address, network)
-    } else address = toNewFormat(address, network)
+    try {
+      const { serializers = {} } = networks[network] || {}
+      if (serializers.address) address = serializers.address.decode(address)
+      else address = toNewFormat(address, network)
+    } catch (e) {}
     return primitives.Address.fromString(address, network)
   }
 
