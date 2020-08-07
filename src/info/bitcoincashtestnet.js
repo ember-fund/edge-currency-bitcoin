@@ -35,7 +35,7 @@ const engineInfo: EngineCurrencyInfo = {
   gapLimit: 10,
   defaultFee: 10000,
   feeUpdateInterval: 60000,
-  feeInfoServer: '',
+  earnComFeeInfoServer: '',
   customFeeSettings: ['satPerByte'],
   simpleFeeSettings: {
     highFee: '10',
@@ -51,7 +51,7 @@ const currencyInfo: EdgeCurrencyInfo = {
   // Basic currency information:
   currencyCode: 'TBCH',
   displayName: 'Bitcoin Cash Testnet',
-  pluginName: 'bitcoincashtestnet',
+  pluginId: 'bitcoincashtestnet',
   denominations: [
     { name: 'TBCH', multiplier: '100000000', symbol: '₿' },
     { name: 'mTBCH', multiplier: '100000', symbol: 'm₿' },

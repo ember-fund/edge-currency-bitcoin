@@ -28,6 +28,7 @@ const fakeLogger = {
   warn: () => {},
   error: () => {}
 }
+const log = Object.assign(() => {}, { error() {}, warn() {} })
 
 const DATA_STORE_FOLDER = 'txEngineFolderBTC'
 const FIXTURES_FOLDER = join(__dirname, 'fixtures')
@@ -64,17 +65,18 @@ for (const dir of dirs(FIXTURES_FOLDER)) {
 
   const fakeIo = makeFakeIo()
   const pluginOpts: EdgeCorePluginOptions = {
+    initOptions: {},
     io: {
       ...fakeIo,
       console: fakeLogger,
       random: size => fixture.key,
       fetch: fetch
     },
-    initOptions: {},
+    log,
     nativeIo: {},
     pluginDisklet: fakeIo.disklet
   }
-  const factory = edgeCorePlugins[fixture.pluginName]
+  const factory = edgeCorePlugins[fixture.pluginId]
   if (typeof factory !== 'function') throw new TypeError('Bad plugin')
   const corePlugin: EdgeCorePlugin = factory(pluginOpts)
   const plugin: EdgeCurrencyPlugin = (corePlugin: any)
@@ -104,6 +106,7 @@ for (const dir of dirs(FIXTURES_FOLDER)) {
   const walletLocalFolder = downgradeDisklet(walletLocalDisklet)
   const engineOpts: EdgeCurrencyEngineOptions = {
     callbacks,
+    log,
     walletLocalDisklet,
     walletLocalEncryptedDisklet: walletLocalDisklet,
     userSettings: fixture.ChangeSettings

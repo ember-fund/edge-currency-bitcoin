@@ -38,7 +38,7 @@ const engineInfo: EngineCurrencyInfo = {
   gapLimit: 10,
   defaultFee: 1000,
   feeUpdateInterval: 60000,
-  feeInfoServer: '',
+  earnComFeeInfoServer: '',
   customFeeSettings: ['satPerByte'],
   simpleFeeSettings: {
     highFee: '200',
@@ -72,7 +72,7 @@ const currencyInfo: EdgeCurrencyInfo = {
 
   currencyCode: 'BTG',
   displayName: 'Bitcoin Gold',
-  pluginName: 'bitcoingold',
+  pluginId: 'bitcoingold',
   denominations: [
     { name: 'BTG', multiplier: '100000000', symbol: '₿' },
     { name: 'mBTG', multiplier: '100000', symbol: 'm₿' },

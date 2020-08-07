@@ -9,6 +9,7 @@ import {
   type EdgeDataDump,
   type EdgeFreshAddress,
   type EdgeGetTransactionsOptions,
+  type EdgeLog,
   type EdgePaymentProtocolInfo,
   type EdgeSpendInfo,
   type EdgeSpendTarget,
@@ -45,7 +46,12 @@ import type { EngineStateCallbacks } from './engineState.js'
 import { EngineState } from './engineState.js'
 import type { KeyManagerCallbacks } from './keyManager'
 import { KeyManager } from './keyManager'
-import { calcFeesFromEarnCom, calcMinerFeePerByte } from './miningFees.js'
+import {
+  asMempoolSpaceResult,
+  calcFeesFromEarnCom,
+  calcFeesFromMempoolSpace,
+  calcMinerFeePerByte
+} from './miningFees.js'
 import {
   createPayment,
   getPaymentDetails,
@@ -78,7 +84,8 @@ export type EngineCurrencyInfo = {
 
   // Optional Settings
   forks?: Array<string>,
-  feeInfoServer?: string,
+  earnComFeeInfoServer?: string,
+  mempoolSpaceFeeInfoServer?: string,
   timestampFromHeader?: (header: Buffer, height: number) => number
 }
 
@@ -108,6 +115,7 @@ export class CurrencyEngine {
   walletLocalDisklet: Disklet
   walletLocalEncryptedDisklet: Disklet
   io: PluginIo
+  log: EdgeLog
   feeUpdateInterval: number
   feeTimer: any
   fees: BitcoinFees
@@ -141,6 +149,7 @@ export class CurrencyEngine {
     this.walletLocalDisklet = options.walletLocalDisklet
     this.walletLocalEncryptedDisklet = options.walletLocalEncryptedDisklet
     this.io = io
+    this.log = options.log
     this.engineInfo = engineInfo
     this.feeUpdateInterval = this.engineInfo.feeUpdateInterval
     this.currencyCode = this.engineInfo.currencyCode
@@ -177,6 +186,7 @@ export class CurrencyEngine {
       files: { txs: 'txs.json', addresses: 'addresses.json' },
       callbacks: engineStateCallbacks,
       io: this.io,
+      log: this.log,
       localDisklet: this.walletLocalDisklet,
       encryptedLocalDisklet: this.walletLocalEncryptedDisklet,
       pluginState: this.pluginState,
@@ -213,7 +223,7 @@ export class CurrencyEngine {
     const rawKeys = { ...otherKeys, master: { xpub, ...master } }
 
     logger.info(
-      `${this.walletId} - Created Wallet Type ${format} for Currency Plugin ${this.pluginState.pluginName}`
+      `${this.walletId} - Created Wallet Type ${format} for Currency Plugin ${this.pluginState.pluginId}`
     )
 
     this.keyManager = new KeyManager({
@@ -299,24 +309,48 @@ export class CurrencyEngine {
   }
 
   async updateFeeFromVendor() {
-    const { feeInfoServer } = this.engineInfo
-    if (!feeInfoServer || feeInfoServer === '') {
+    const { earnComFeeInfoServer, mempoolSpaceFeeInfoServer } = this.engineInfo
+    let success = false
+    if (!earnComFeeInfoServer && !mempoolSpaceFeeInfoServer) {
       clearTimeout(this.feeTimer)
       return
     }
     try {
       if (Date.now() - this.fees.timestamp > this.feeUpdateInterval) {
-        const results = await this.io.fetch(feeInfoServer)
-        if (results.status !== 200) {
-          throw new Error(results.body)
+        // try earn.com first
+        if (!success && earnComFeeInfoServer) {
+          const response = await this.io.fetch(earnComFeeInfoServer)
+          // try earn.com
+          if (!response.ok) {
+            throw new Error(
+              `${earnComFeeInfoServer} returned status ${response.status}`
+            )
+          }
+          const feesJson: EarnComFees = await response.json()
+          if (validateObject(feesJson, EarnComFeesSchema)) {
+            const newFees = calcFeesFromEarnCom(feesJson.fees)
+            this.fees = { ...this.fees, ...newFees }
+            this.fees.timestamp = Date.now()
+          } else {
+            throw new Error('Fetched invalid networkFees')
+          }
         }
-        const feesJson: EarnComFees = await results.json()
-        if (validateObject(feesJson, EarnComFeesSchema)) {
-          const newFees = calcFeesFromEarnCom(feesJson.fees)
-          this.fees = { ...this.fees, ...newFees }
-          this.fees.timestamp = Date.now()
-        } else {
-          throw new Error('Fetched invalid networkFees')
+
+        // if necessary, try mempool.space
+        if (!success && mempoolSpaceFeeInfoServer) {
+          try {
+            const response = await this.io.fetch(mempoolSpaceFeeInfoServer)
+            if (response.ok) {
+              const feesJson = await response.json()
+              asMempoolSpaceResult(feesJson)
+              const newFees = calcFeesFromMempoolSpace(feesJson)
+              this.fees = { ...this.fees, ...newFees }
+              this.fees.timestamp = Date.now()
+              success = true
+            }
+          } catch (e) {
+            logger.info('mempool.space error', e)
+          }
         }
       }
     } catch (e) {
@@ -428,13 +462,9 @@ export class CurrencyEngine {
     return []
   }
 
-  addCustomToken(token: any): Promise<void> {
-    return Promise.reject(new Error('This plugin has no tokens'))
-  }
+  async addCustomToken(token: any): Promise<void> {}
 
-  disableTokens(tokens: Array<string>): Promise<void> {
-    return Promise.reject(new Error('This plugin has no tokens'))
-  }
+  async disableTokens(tokens: Array<string>): Promise<void> {}
 
   getTokenStatus(token: string): boolean {
     return false
@@ -542,7 +572,8 @@ export class CurrencyEngine {
       encryptedLocalDisklet: this.walletLocalEncryptedDisklet,
       pluginState: this.pluginState,
       walletId: this.prunedWalletId,
-      engineInfo: this.engineInfo
+      engineInfo: this.engineInfo,
+      log: this.log
     })
 
     await engineState.load()
@@ -606,7 +637,7 @@ export class CurrencyEngine {
 
     // Test if we have enough to spend
     if (bns.gt(totalAmountToSend, `${sumUtxos(utxos)}`)) {
-      throw new InsufficientFundsError()
+      throw new InsufficientFundsError(this.currencyCode)
     }
     try {
       // Get the rate according to the latest fee
@@ -661,6 +692,9 @@ export class CurrencyEngine {
         blockHeight: 0,
         nativeAmount: `${nativeAmount}`,
         networkFee: `${bcoinTx.getFee()}`,
+        feeRateUsed: {
+          satPerVByte: rate / 1000
+        },
         signedTx: ''
       }
 
@@ -673,18 +707,22 @@ export class CurrencyEngine {
 
       return edgeTransaction
     } catch (e) {
-      if (e.type === 'FundingError') throw new Error('InsufficientFundsError')
+      if (e.type === 'FundingError')
+        throw new InsufficientFundsError(this.currencyCode)
       throw e
     }
   }
 
   async signTx(edgeTransaction: EdgeTransaction): Promise<EdgeTransaction> {
-    const { edgeSpendInfo, txJson } = edgeTransaction.otherParams || {}
+    if (edgeTransaction.otherParams == null) edgeTransaction.otherParams = {}
+    const { otherParams } = edgeTransaction
+    const { edgeSpendInfo, txJson } = otherParams
     this.logEdgeTransaction(edgeTransaction, 'Signing')
     const bcoinTx = parseJsonTransaction(txJson)
-    const { privateKeys = [], otherParams = {} } = edgeSpendInfo
-    const { paymentProtocolInfo } = otherParams
+    const { privateKeys = [] } = edgeSpendInfo
     const { signedTx, txid } = await this.keyManager.sign(bcoinTx, privateKeys)
+
+    const { paymentProtocolInfo } = edgeSpendInfo.otherParams || {}
     if (paymentProtocolInfo) {
       const publicAddress = this.getFreshAddress().publicAddress
       const address = toLegacyFormat(publicAddress, this.network)
@@ -694,7 +732,7 @@ export class CurrencyEngine {
         signedTx,
         this.currencyCode
       )
-      Object.assign(edgeTransaction.otherParams, {
+      Object.assign(otherParams, {
         paymentProtocolInfo: { ...paymentProtocolInfo, payment }
       })
     }
@@ -709,7 +747,8 @@ export class CurrencyEngine {
   async broadcastTx(
     edgeTransaction: EdgeTransaction
   ): Promise<EdgeTransaction> {
-    const { otherParams = {}, signedTx, currencyCode } = edgeTransaction
+    if (edgeTransaction.otherParams == null) edgeTransaction.otherParams = {}
+    const { otherParams, signedTx, currencyCode } = edgeTransaction
     const { paymentProtocolInfo } = otherParams
 
     if (paymentProtocolInfo && paymentProtocolInfo.payment) {
@@ -728,7 +767,7 @@ export class CurrencyEngine {
 
     const tx = verifyTxAmount(signedTx)
     if (!tx) throw new Error('Wrong spend amount')
-    edgeTransaction.otherParams.txJson = tx.getJSON(this.network)
+    otherParams.txJson = tx.getJSON(this.network)
     this.logEdgeTransaction(edgeTransaction, 'Broadcasting')
 
     // Try APIs
@@ -764,7 +803,7 @@ export class CurrencyEngine {
       walletId: this.walletId.split(' - ')[0],
       walletType: this.walletInfo.type,
       walletFormat: this.walletInfo.keys && this.walletInfo.keys.format,
-      pluginType: this.pluginState.pluginName,
+      pluginType: this.pluginState.pluginId,
       fees: this.fees,
       data: {
         ...this.pluginState.dumpData(),

@@ -43,7 +43,7 @@ const engineInfo: EngineCurrencyInfo = {
   gapLimit: 10,
   defaultFee: 1000,
   feeUpdateInterval: 60000,
-  feeInfoServer: '',
+  earnComFeeInfoServer: '',
   customFeeSettings: ['satPerByte'],
   simpleFeeSettings: {
     highFee: '30',
@@ -59,7 +59,7 @@ const currencyInfo: EdgeCurrencyInfo = {
   // Basic currency information:
   currencyCode: 'TBTC',
   displayName: 'Bitcoin Testnet',
-  pluginName: 'bitcointestnet',
+  pluginId: 'bitcointestnet',
   denominations: [
     { name: 'TBTC', multiplier: '100000000', symbol: '₿' },
     { name: 'mTBTC', multiplier: '100000', symbol: 'm₿' },

@@ -18,6 +18,7 @@ const fakeLogger = {
   warn: () => {},
   error: () => {}
 }
+const log = Object.assign(() => {}, { error() {}, warn() {} })
 
 for (const fixture of fixtures) {
   const WALLET_TYPE = fixture.WALLET_TYPE
@@ -30,16 +31,17 @@ for (const fixture of fixtures) {
 
   const fakeIo = makeFakeIo()
   const pluginOpts: EdgeCorePluginOptions = {
+    initOptions: {},
     io: {
       ...fakeIo,
       console: fakeLogger,
       random: size => fixture.key
     },
-    initOptions: {},
+    log,
     nativeIo: {},
     pluginDisklet: fakeIo.disklet
   }
-  const factory = edgeCorePlugins[fixture.pluginName]
+  const factory = edgeCorePlugins[fixture.pluginId]
   if (typeof factory !== 'function') throw new TypeError('Bad plugin')
   const corePlugin: EdgeCorePlugin = factory(pluginOpts)
   const plugin: EdgeCurrencyPlugin = (corePlugin: any)

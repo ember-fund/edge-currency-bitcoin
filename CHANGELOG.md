@@ -1,5 +1,49 @@
 # edge-currency-bitcoin
 
+# 4.8.4 (2020-07-09)
+
+- Upgrade edge-core-js to v0.17.8
+- Add feeRateUsed to edgeTransaction
+
+# 4.8.3 (2020-07-05)
+
+- Send additional logging to core
+
+# 4.8.2 (2020-06-22)
+
+- Prioritize Earn.com fee estimation
+- Decrease fee level block targets
+
+# 4.8.1 (2020-06-15)
+
+- Make sure minimum LOW_FEE is enforced on all fee levels
+
+# 4.8.0 (2020-05-28)
+
+- Add mempool.space recommended bitcoin fee API
+- Increased target block delays for earn.com fee estimator
+- Increased bitcoin gap limit to 25
+
+# 4.7.7 (2020-02-13)
+
+- Fixed replay-protection address cache
+
+# 4.7.6 (2020-02-09)
+
+- Remove token throw
+
+# 4.7.5 (2020-02-04)
+
+- Fix issue when signing a message containing special characters.
+
+# 4.7.4 (2020-01-13)
+
+- Fix BCH Xpub explorer url
+
+# 4.7.3 (2020-01-12)
+
+- Add BCH Xpub explorer url
+
 # 4.7.2 (2019-12-31)
 
 - Allow parsing BCH addresses that start with `bitcoincash:`

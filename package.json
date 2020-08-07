@@ -1,6 +1,6 @@
 {
   "name": "edge-currency-bitcoin",
-  "version": "4.7.2",
+  "version": "4.8.4",
   "description": "Edge Bitcoin currency plugin",
   "homepage": "https://edge.app",
   "repository": {
@@ -54,6 +54,7 @@
     "bs58smartcheck": "^2.0.4",
     "buffer": "^5.2.1",
     "chai": "^4.2.0",
+    "cleaners": "^0.2.0",
     "esm": "^3.2.4",
     "eventemitter3": "^3.1.0",
     "jsonschema": "^1.2.4",
@@ -70,7 +71,7 @@
     "@babel/runtime": "^7.0.0",
     "babel-eslint": ">=10.0.0",
     "babel-loader": "^8.0.5",
-    "edge-core-js": "0.15.0",
+    "edge-core-js": "0.17.8",
     "eslint": ">=6.2.2",
     "eslint-config-standard-kit": ">=0.14.2",
     "eslint-plugin-flowtype": ">=4.3.0",
