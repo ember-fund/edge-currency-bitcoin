@@ -11,7 +11,6 @@ import {
 import { Buffer } from 'buffer'
 
 import { type EngineState } from '../engine/engineState.js'
-import { logger } from '../utils/logger.js'
 import { toNewFormat } from './addressFormat.js'
 import {
   hash256,
@@ -143,7 +142,11 @@ export const verifyUriProtocol = (
 ) => {
   const { uriPrefix = '' } = networks[network] || {}
   if (protocol) {
-    const prot = protocol.replace(':', '').toLowerCase()
+    const prot = protocol
+      .replace(':', '')
+      .replace('-', '')
+      .toLowerCase()
+    if (prot === 'pay') return true
     return prot === pluginId || prot === uriPrefix
   }
   return true
@@ -281,7 +284,7 @@ export const getPrivateFromSeed = async (seed: string, network: string) => {
     const mnemonic = hd.Mnemonic.fromPhrase(seed)
     return hd.PrivateKey.fromMnemonic(mnemonic, network)
   } catch (e) {
-    logger.error('Not a mnemonic, treating the seed as base64')
+    // If not a mnemonic treat the seed as base64')
     return hd.PrivateKey.fromSeed(Buffer.from(seed, 'base64'), network)
   }
 }
@@ -393,7 +396,7 @@ export const sumTransaction = (
         ? serializers.address.encode(address)
         : address
     } catch (e) {
-      logger.error(e)
+      engineState.log(e)
       if (value <= 0) {
         continue
       } else {

@@ -1,11 +1,10 @@
 // @flow
 
 import { primitives } from 'bcoin'
-import { type EdgePaymentProtocolInfo } from 'edge-core-js/types'
+import { type EdgeLog, type EdgePaymentProtocolInfo } from 'edge-core-js/types'
 import parse from 'url-parse'
 
 import { toLegacyFormat, toNewFormat } from '../utils/addressFormat.js'
-import { logger } from '../utils/logger.js'
 
 const getSpendTargets = (
   outputs: Array<any>,
@@ -29,9 +28,13 @@ const getSpendTargets = (
 const getBitPayPayment = async (
   paymentProtocolURL: string,
   network: string,
+  currencyCode: string,
   fetch: any
 ): Promise<EdgePaymentProtocolInfo> => {
-  const headers = { Accept: 'application/payment-request' }
+  const headers = {
+    Accept: 'application/payment-request',
+    'x-currency': currencyCode
+  }
   const result = await fetch(paymentProtocolURL, { headers })
   if (parseInt(result.status) !== 200) {
     const error = await result.text()
@@ -78,7 +81,7 @@ export async function getPaymentDetails(
   currencyCode: string,
   fetch: any
 ): Promise<EdgePaymentProtocolInfo> {
-  return getBitPayPayment(paymentProtocolURL, network, fetch)
+  return getBitPayPayment(paymentProtocolURL, network, currencyCode, fetch)
 }
 
 export function createPayment(
@@ -94,7 +97,8 @@ export async function sendPayment(
   fetch: any,
   network: string,
   paymentUrl: string,
-  payment: any
+  payment: any,
+  log: EdgeLog
 ): Promise<any> {
   const headers = { 'Content-Type': 'application/payment' }
   if (global.androidFetch) {
@@ -107,7 +111,7 @@ export async function sendPayment(
       const paymentACK = JSON.parse(result)
       return paymentACK
     } catch (e) {
-      logger.error(e)
+      log(e)
       throw e
     }
   }

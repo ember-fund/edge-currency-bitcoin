@@ -1,5 +1,7 @@
 // @flow
 
+import { type EdgeLog } from 'edge-core-js/types'
+
 import { toNewFormat } from '../utils/addressFormat.js'
 import type {
   BlockHeight,
@@ -15,7 +17,6 @@ import {
   formatSelector,
   getAllKeyRings
 } from '../utils/formatSelector.js'
-import { logger } from '../utils/logger.js'
 import { type AddressInfo } from './engineState.js'
 
 const GAP_LIMIT = 10
@@ -101,7 +102,9 @@ export type KeyManagerOptions = {
   engineState: BasicEngineState,
 
   // Callbacks:
-  callbacks: KeyManagerCallbacks
+  callbacks: KeyManagerCallbacks,
+
+  log: EdgeLog
 }
 
 export class KeyManager {
@@ -119,6 +122,8 @@ export class KeyManager {
 
   // EngineState:
   engineState: BasicEngineState
+
+  log: EdgeLog
 
   // Callbacks:
   onNewAddress: (
@@ -139,7 +144,8 @@ export class KeyManager {
       seed = '',
       gapLimit = GAP_LIMIT,
       network,
-      callbacks
+      callbacks,
+      log
     } = opts
 
     // Check for any way to init the wallet with either a seed or master keys
@@ -163,6 +169,7 @@ export class KeyManager {
     const { onNewAddress = nop, onNewKey = nop } = callbacks
     this.onNewAddress = onNewAddress
     this.onNewKey = onNewKey
+    this.log = log
 
     // Create KeyRings while tring to load as many of the pubKey/privKey from the cache
     this.keys = this.fSelector.keysFromRaw(rawKeys)
@@ -302,7 +309,7 @@ export class KeyManager {
       try {
         return this.fSelector.parseSeed(this.seed)
       } catch (e) {
-        logger.error(e)
+        this.log(e)
         return null
       }
     }
@@ -406,7 +413,7 @@ export class KeyManager {
       }
       this.onNewKey(keys)
     } catch (e) {
-      logger.error(e)
+      this.log(e)
     }
   }
 

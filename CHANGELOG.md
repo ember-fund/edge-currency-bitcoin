@@ -1,5 +1,17 @@
 # edge-currency-bitcoin
 
+# 4.9.2 (2020-09-30)
+
+- Add 'bitcoin-sv:' URI support
+
+# 4.9.1 (2020-08-31)
+
+- Replace logger with EdgeLog
+
+# 4.9.0 (2020-08-17)
+
+- Add support for Anypay payment protocol
+
 # 4.8.6 (2020-07-29)
 
 - Fix server scoring bug where low scoring electrumwss servers would reset to default score

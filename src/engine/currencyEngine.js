@@ -39,7 +39,6 @@ import {
   EarnComFeesSchema,
   InfoServerFeesSchema
 } from '../utils/jsonSchemas.js'
-import { logger } from '../utils/logger.js'
 import { promiseAny, validateObject } from '../utils/utils.js'
 import { broadcastFactories } from './broadcastApi.js'
 import type { EngineStateCallbacks } from './engineState.js'
@@ -156,7 +155,7 @@ export class CurrencyEngine {
     this.network = this.engineInfo.network
 
     this.fees = { ...engineInfo.simpleFeeSettings, timestamp: 0 }
-    logger.info(
+    this.log(
       `${this.prunedWalletId}: create engine type: ${this.walletInfo.type}`
     )
 
@@ -222,7 +221,7 @@ export class CurrencyEngine {
     const xpub = keys[`${this.network}Xpub`]
     const rawKeys = { ...otherKeys, master: { xpub, ...master } }
 
-    logger.info(
+    this.log(
       `${this.walletId} - Created Wallet Type ${format} for Currency Plugin ${this.pluginState.pluginId}`
     )
 
@@ -234,7 +233,8 @@ export class CurrencyEngine {
       callbacks: callbacks,
       gapLimit: this.engineInfo.gapLimit,
       network: this.network,
-      engineState: this.engineState
+      engineState: this.engineState,
+      log: this.log
     })
 
     this.engineState.onAddressUsed = () => {
@@ -304,7 +304,7 @@ export class CurrencyEngine {
         throw new Error('Fetched invalid networkFees')
       }
     } catch (err) {
-      logger.info(`${this.prunedWalletId} - ${err.toString()}`)
+      this.log(`${this.prunedWalletId} - ${err.toString()}`)
     }
   }
 
@@ -328,10 +328,11 @@ export class CurrencyEngine {
           }
           const feesJson: EarnComFees = await response.json()
           if (validateObject(feesJson, EarnComFeesSchema)) {
-            const newFees = calcFeesFromEarnCom(feesJson.fees)
+            const newFees = calcFeesFromEarnCom(feesJson.fees, this.log)
             this.fees = { ...this.fees, ...newFees }
             this.fees.timestamp = Date.now()
           } else {
+            this.log('Fetched invalid earn.com networkFees')
             throw new Error('Fetched invalid networkFees')
           }
         }
@@ -349,12 +350,12 @@ export class CurrencyEngine {
               success = true
             }
           } catch (e) {
-            logger.info('mempool.space error', e)
+            this.log(`mempool.space error ${JSON.stringify(e)}`)
           }
         }
       }
     } catch (e) {
-      logger.info(
+      this.log(
         `${
           this.prunedWalletId
         } - Error while trying to update fee table ${e.toString()}`
@@ -410,7 +411,7 @@ export class CurrencyEngine {
       log += JSON.stringify(edgeTransaction.otherParams.txJson, null, 2) + '\n'
     }
     log += '------------------------------------------------------------------'
-    logger.info(`${this.prunedWalletId}: ${log}`)
+    this.log(`${this.prunedWalletId}: ${log}`)
   }
 
 
@@ -516,7 +517,7 @@ export class CurrencyEngine {
         this.engineState.markAddressesUsed(scriptHashs)
         if (this.keyManager) this.keyManager.setLookAhead()
       })
-      .catch(e => logger.info(`${this.prunedWalletId}: ${e.toString()}`))
+      .catch(e => this.log(`${this.prunedWalletId}: ${e.toString()}`))
   }
 
   isAddressUsed(address: string, options: any): boolean {
@@ -598,7 +599,7 @@ export class CurrencyEngine {
         this.io.fetch
       )
     } catch (err) {
-      logger.info(`${this.prunedWalletId} - ${err.toString()}`)
+      this.log(`${this.prunedWalletId} - ${err.toString()}`)
       throw err
     }
   }
@@ -613,6 +614,7 @@ export class CurrencyEngine {
     }
     // Can't spend without outputs
     if (!txOptions.CPFP && (!spendTargets || spendTargets.length < 1)) {
+      this.log('Need to provide Spend Targets')
       throw new Error('Need to provide Spend Targets')
     }
     // Calculate the total amount to send
@@ -637,12 +639,13 @@ export class CurrencyEngine {
 
     // Test if we have enough to spend
     if (bns.gt(totalAmountToSend, `${sumUtxos(utxos)}`)) {
+      this.log(`InsufficientFundError ${this.currencyCode}`)
       throw new InsufficientFundsError(this.currencyCode)
     }
     try {
       // Get the rate according to the latest fee
       const rate = this.getRate(edgeSpendInfo)
-      logger.info(`spend: Using fee rate ${rate} sat/K`)
+      this.log(`spend: Using fee rate ${rate} sat/K`)
       // Create outputs from spendTargets
 
       const outputs = []
@@ -707,6 +710,7 @@ export class CurrencyEngine {
 
       return edgeTransaction
     } catch (e) {
+      this.log(`makeSpend error ${JSON.stringify(e)}`)
       if (e.type === 'FundingError')
         throw new InsufficientFundsError(this.currencyCode)
       throw e
@@ -756,7 +760,8 @@ export class CurrencyEngine {
         this.io.fetch,
         this.network,
         paymentProtocolInfo.paymentUrl,
-        paymentProtocolInfo.payment
+        paymentProtocolInfo.payment,
+        this.log
       )
       if (!paymentAck) {
         throw new Error(
@@ -774,7 +779,7 @@ export class CurrencyEngine {
     const promiseArray = []
     if (!this.pluginState.disableFetchingServers) {
       for (const broadcastFactory of broadcastFactories) {
-        const broadcaster = broadcastFactory(this.io, currencyCode)
+        const broadcaster = broadcastFactory(this.io, currencyCode, this.log)
         if (broadcaster) promiseArray.push(broadcaster(signedTx))
       }
     }
