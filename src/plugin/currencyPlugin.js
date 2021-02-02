@@ -78,6 +78,7 @@ export class CurrencyTools {
     // Private API:
     this.io = io
     log(`Creating Currency Plugin for ${this.pluginId}`)
+    log('tester tester btc')
     this.network = engineInfo.network
     const { defaultSettings, pluginId, currencyCode } = this.currencyInfo
     this.state = new PluginState({
