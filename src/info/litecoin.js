@@ -4,7 +4,6 @@ import { type EdgeCurrencyInfo } from 'edge-core-js/types'
 
 import type { EngineCurrencyInfo } from '../engine/currencyEngine.js'
 import type { BcoinCurrencyInfo } from '../utils/bcoinExtender/bcoinExtender.js'
-import { imageServerUrl } from './constants.js'
 
 const bcoinInfo: BcoinCurrencyInfo = {
   type: 'litecoin',
@@ -24,7 +23,7 @@ const bcoinInfo: BcoinCurrencyInfo = {
     scripthashLegacy: 0x05,
     witnesspubkeyhash: 0x06,
     witnessscripthash: 0x0a,
-    bech32: 'lc'
+    bech32: 'ltc'
   }
 }
 
@@ -96,13 +95,10 @@ const currencyInfo: EdgeCurrencyInfo = {
   metaTokens: [],
 
   // Explorers:
-  blockExplorer: 'https://blockchair.com/litecoin/block/%s',
-  addressExplorer: 'https://blockchair.com/litecoin/address/%s',
-  transactionExplorer: 'https://blockchair.com/litecoin/transaction/%s',
-
-  // Images:
-  symbolImage: `${imageServerUrl}/litecoin-logo-solo-64.png`,
-  symbolImageDarkMono: `${imageServerUrl}/litecoin-logo-solo-64.png`
+  blockExplorer: 'https://blockchair.com/litecoin/block/%s?from=edgeapp',
+  addressExplorer: 'https://blockchair.com/litecoin/address/%s?from=edgeapp',
+  transactionExplorer:
+    'https://blockchair.com/litecoin/transaction/%s?from=edgeapp'
 }
 
 export const litecoin = { bcoinInfo, engineInfo, currencyInfo }

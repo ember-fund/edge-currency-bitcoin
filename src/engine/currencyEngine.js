@@ -71,7 +71,7 @@ export type EngineCurrencyInfo = {
   gapLimit: number,
   defaultFee: number,
   feeUpdateInterval: number,
-  customFeeSettings: Array<string>,
+  customFeeSettings: string[],
   simpleFeeSettings: {
     highFee: string,
     lowFee: string,
@@ -82,7 +82,8 @@ export type EngineCurrencyInfo = {
   },
 
   // Optional Settings
-  forks?: Array<string>,
+  forks?: string[],
+  minRelay?: number,
   earnComFeeInfoServer?: string,
   mempoolSpaceFeeInfoServer?: string,
   timestampFromHeader?: (header: Buffer, height: number) => number
@@ -304,7 +305,7 @@ export class CurrencyEngine {
         throw new Error('Fetched invalid networkFees')
       }
     } catch (err) {
-      this.log(`${this.prunedWalletId} - ${err.toString()}`)
+      this.log.error(`${this.prunedWalletId} - ${err.toString()}`)
     }
   }
 
@@ -332,7 +333,7 @@ export class CurrencyEngine {
             this.fees = { ...this.fees, ...newFees }
             this.fees.timestamp = Date.now()
           } else {
-            this.log('Fetched invalid earn.com networkFees')
+            this.log.error('Fetched invalid earn.com networkFees')
             throw new Error('Fetched invalid networkFees')
           }
         }
@@ -350,12 +351,12 @@ export class CurrencyEngine {
               success = true
             }
           } catch (e) {
-            this.log(`mempool.space error ${JSON.stringify(e)}`)
+            this.log.error(`mempool.space error ${JSON.stringify(e)}`)
           }
         }
       }
     } catch (e) {
-      this.log(
+      this.log.error(
         `${
           this.prunedWalletId
         } - Error while trying to update fee table ${e.toString()}`
@@ -385,9 +386,15 @@ export class CurrencyEngine {
     }
     const customFeeSetting = this.engineInfo.customFeeSettings[0]
     const customFeeAmount = customNetworkFee[customFeeSetting] || '0'
-    if (networkFeeOption === 'custom' && customFeeAmount !== '0') {
+    if (networkFeeOption === 'custom') {
+      const customFeeNumber = Number(customFeeAmount)
+      if (customFeeNumber < 1 || isNaN(customFeeNumber)) {
+        const e = new Error(`1 satPerByte`)
+        e.name = 'ErrorBelowMinimumFee'
+        throw e
+      }
       // customNetworkFee is in sat/Bytes in need to be converted to sat/KB
-      return parseInt(customFeeAmount) * BYTES_TO_KB
+      return customFeeNumber * BYTES_TO_KB
     } else {
       const amountForTx = spendTargets
         .reduce((s, { nativeAmount }) => s + parseInt(nativeAmount), 0)
@@ -411,7 +418,7 @@ export class CurrencyEngine {
       log += JSON.stringify(edgeTransaction.otherParams.txJson, null, 2) + '\n'
     }
     log += '------------------------------------------------------------------'
-    this.log(`${this.prunedWalletId}: ${log}`)
+    this.log.warn(`${this.prunedWalletId}: ${log}`)
   }
 
 
@@ -457,15 +464,15 @@ export class CurrencyEngine {
     return this.pluginState.height
   }
 
-  async enableTokens(tokens: Array<string>): Promise<void> {}
+  async enableTokens(tokens: string[]): Promise<void> {}
 
-  async getEnabledTokens(): Promise<Array<string>> {
+  async getEnabledTokens(): Promise<string[]> {
     return []
   }
 
   async addCustomToken(token: any): Promise<void> {}
 
-  async disableTokens(tokens: Array<string>): Promise<void> {}
+  async disableTokens(tokens: string[]): Promise<void> {}
 
   getTokenStatus(token: string): boolean {
     return false
@@ -481,7 +488,7 @@ export class CurrencyEngine {
 
   async getTransactions(
     options: EdgeGetTransactionsOptions
-  ): Promise<Array<EdgeTransaction>> {
+  ): Promise<EdgeTransaction[]> {
     const rawTxs = this.engineState.txCache
     const edgeTransactions = []
     for (const txid in rawTxs) {
@@ -506,18 +513,18 @@ export class CurrencyEngine {
     return { publicAddress, legacyAddress }
   }
 
-  addGapLimitAddresses(addresses: Array<string>, options: any): void {
+  addGapLimitAddresses(addresses: string[], options: any): void {
     const scriptHashPromises = addresses.map(address => {
       const scriptHash = this.engineState.scriptHashes[address]
       if (typeof scriptHash === 'string') return Promise.resolve(scriptHash)
       else return addressToScriptHash(address, this.network)
     })
     Promise.all(scriptHashPromises)
-      .then((scriptHashs: Array<string>) => {
+      .then((scriptHashs: string[]) => {
         this.engineState.markAddressesUsed(scriptHashs)
         if (this.keyManager) this.keyManager.setLookAhead()
       })
-      .catch(e => this.log(`${this.prunedWalletId}: ${e.toString()}`))
+      .catch(e => this.log.error(`${this.prunedWalletId}: ${e.toString()}`))
   }
 
   isAddressUsed(address: string, options: any): boolean {
@@ -599,7 +606,7 @@ export class CurrencyEngine {
         this.io.fetch
       )
     } catch (err) {
-      this.log(`${this.prunedWalletId} - ${err.toString()}`)
+      this.log.error(`${this.prunedWalletId} - ${err.toString()}`)
       throw err
     }
   }
@@ -614,7 +621,7 @@ export class CurrencyEngine {
     }
     // Can't spend without outputs
     if (!txOptions.CPFP && (!spendTargets || spendTargets.length < 1)) {
-      this.log('Need to provide Spend Targets')
+      this.log.error('Need to provide Spend Targets')
       throw new Error('Need to provide Spend Targets')
     }
     // Calculate the total amount to send
@@ -639,15 +646,17 @@ export class CurrencyEngine {
 
     // Test if we have enough to spend
     if (bns.gt(totalAmountToSend, `${sumUtxos(utxos)}`)) {
-      this.log(`InsufficientFundError ${this.currencyCode}`)
+      this.log.error(`InsufficientFundError ${this.currencyCode}`)
       throw new InsufficientFundsError(this.currencyCode)
     }
     try {
       // Get the rate according to the latest fee
       const rate = this.getRate(edgeSpendInfo)
-      this.log(`spend: Using fee rate ${rate} sat/K`)
-      // Create outputs from spendTargets
+      this.log.warn(`spend: Using fee rate ${rate} sat/K`)
 
+      const minRelay = this.engineInfo.minRelay
+
+      // Create outputs from spendTargets
       const outputs = []
       for (const spendTarget of spendTargets) {
         const {
@@ -664,6 +673,7 @@ export class CurrencyEngine {
         outputs,
         utxos,
         rate,
+        minRelay,
         txOptions,
         isMasterWallet: this.isEmberMasterWallet(),
         height: this.getBlockHeight()
@@ -676,11 +686,13 @@ export class CurrencyEngine {
         address => scriptHashes[address]
       )
 
+      // LOCAL CHANGES
       let nativeAmount = bcoinTx.getOutputValue() - parseInt(bcoinTx.getFee())
       // When using the subtractFee option, bcoin subtract evenly the network fee from the outputs
       if (txOptions.subtractFee) {
         nativeAmount = bcoinTx.getOutputValue()
       }
+      const networkFee = bcoinTx.getFee()
 
       const edgeTransaction: EdgeTransaction = {
         ourReceiveAddresses,
@@ -694,7 +706,7 @@ export class CurrencyEngine {
         date: 0,
         blockHeight: 0,
         nativeAmount: `${nativeAmount}`,
-        networkFee: `${bcoinTx.getFee()}`,
+        networkFee: `${networkFee}`,
         feeRateUsed: {
           satPerVByte: rate / 1000
         },
@@ -710,7 +722,7 @@ export class CurrencyEngine {
 
       return edgeTransaction
     } catch (e) {
-      this.log(`makeSpend error ${JSON.stringify(e)}`)
+      this.log.error(`makeSpend error ${JSON.stringify(e)}`)
       if (e.type === 'FundingError')
         throw new InsufficientFundsError(this.currencyCode)
       throw e

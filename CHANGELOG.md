@@ -1,5 +1,67 @@
 # edge-currency-bitcoin
 
+# 4.9.15 (2021-06-03)
+
+- Remove icon URLs
+- Upgrade edge-core-js to v0.17.33
+- Upgrade to Webpack 5
+- Upgrade cleaners to v0.3.9
+
+# 4.9.14 (2021-04-07)
+
+- LTC: Fix bech32 prefix
+- Update image content URL
+
+# 4.9.13 (2021-03-09)
+
+- RVN: Support old specification of blockheader check in newer blocks
+
+# 4.9.12 (2021-02-11)
+
+- Rename TBTC to TESTBTC to avoid conflict with tBTC ERC20 token
+
+# 4.9.11 (2021-02-04)
+
+- Refactor parseTransaction test
+- Add support for large input values
+
+# 4.9.10 (2021-01-25)
+
+- Throw error when custom fee is below 1 sat/byte
+
+# 4.9.9 (2021-01-20)
+
+- Add StratumError to carry the throwing server's URI
+- Update to eslint-config-standard-kit to v0.15.1
+
+# 4.9.8 (2021-01-05)
+
+- Adjust log levels
+- Add parseUri tests
+
+# 4.9.7 (2020-12-22)
+
+- DOGE: Remove `hardFee` in favor of setting default sat/byte fee to meet network minimum
+- Add `minRelay` parameter to bcoin to allow custom dust threshold
+
+# 4.9.6 (2020-12-15)
+
+- Suppress electrum spam server messages
+- Use XZC code when querying info1 for FIRO electrum servers
+
+# 4.9.5 (2020-12-08)
+
+- Update Blockchair explorer URLs to include partner ID
+
+# 4.9.4 (2020-12-04)
+
+- Change Zcoin to Firo
+- Update InfoServer constant
+
+# 4.9.3 (2020-11-19)
+
+- Set `hardFee` for DOGE to meet minumum network transaction fee
+
 # 4.9.2 (2020-09-30)
 
 - Add 'bitcoin-sv:' URI support

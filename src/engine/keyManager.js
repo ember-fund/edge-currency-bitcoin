@@ -33,7 +33,7 @@ export type Address = {
 export type KeyRing = {
   pubKey: any,
   privKey: any,
-  children: Array<Address>
+  children: Address[]
 }
 
 export type Keys = {
@@ -56,8 +56,8 @@ export type RawKeys = {
 }
 
 export type createTxOptions = {
-  outputs?: Array<Output>,
-  utxos: Array<Utxo>,
+  outputs?: Output[],
+  utxos: Utxo[],
   height: BlockHeight,
   rate: number,
   txOptions: TxOptions,
@@ -233,7 +233,7 @@ export class KeyManager {
 
   async createTX(options: createTxOptions): any {
     const { outputs = [], ...rest } = options
-    const standardOutputs: Array<StandardOutput> = []
+    const standardOutputs: StandardOutput[] = []
     const branches = this.fSelector.branches
     for (const output of outputs) {
       let { address = '' } = output
@@ -271,7 +271,7 @@ export class KeyManager {
     })
   }
 
-  async sign(tx: any, privateKeys: Array<string> = []) {
+  async sign(tx: any, privateKeys: string[] = []) {
     const keyRings = await getAllKeyRings(privateKeys, this.network)
     if (!keyRings.length) {
       if (!this.keys.master.privKey && this.seed === '') {
@@ -309,7 +309,7 @@ export class KeyManager {
       try {
         return this.fSelector.parseSeed(this.seed)
       } catch (e) {
-        this.log(e)
+        this.log.error(e)
         return null
       }
     }
@@ -374,7 +374,7 @@ export class KeyManager {
     return { branch: parseInt(branch), index: parseInt(index), redeemScript }
   }
 
-  getNextAvailable(addresses: Array<Address>): string {
+  getNextAvailable(addresses: Address[]): string {
     const { addressInfos } = this.engineState
     let key = null
     for (let i = 0; i < addresses.length; i++) {
@@ -413,7 +413,7 @@ export class KeyManager {
       }
       this.onNewKey(keys)
     } catch (e) {
-      this.log(e)
+      this.log.error(e)
     }
   }
 

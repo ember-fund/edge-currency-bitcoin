@@ -8,7 +8,18 @@ import { type EdgeSocket, type PluginIo } from '../plugin/pluginIo.js'
 import { pushUpdate, removeIdFromQueue } from '../utils/updateQueue.js'
 import { fetchPing, fetchVersion } from './stratumMessages.js'
 
-export type OnFailHandler = (error: Error) => void
+export class StratumError extends Error {
+  name: string
+  uri: string
+
+  constructor(message: string, uri: string) {
+    super(message)
+    this.name = 'StratumError'
+    this.uri = uri
+  }
+}
+
+export type OnFailHandler = (error: StratumError) => void
 
 // Timing can vary a little in either direction for fewer wake ups:
 const TIMER_SLACK = 500
@@ -20,7 +31,7 @@ const KEEP_ALIVE_MS = 60000
  */
 export interface StratumTask {
   method: string;
-  params: Array<any>;
+  params: any[];
   +onDone: (reply: any, requestMs: number) => void;
   +onFail: OnFailHandler;
 }
@@ -33,6 +44,7 @@ export interface StratumCallbacks {
   +onNotifyScriptHash: (scriptHash: string, hash: string) => void;
   +onTimer: (queryTime: number) => void;
   +onVersion: (version: string, requestMs: number) => void;
+  +onSpamServerError: (server: string, score: number | void) => void;
 }
 
 export interface StratumOptions {
@@ -87,8 +99,8 @@ export class StratumConnection {
           this.version = version
           this.callbacks.onVersion(version, requestMs)
         },
-        (error: Error) => {
-          this.log.error(`Failed initial ping ${this.uri}`)
+        (error: StratumError) => {
+          this.log.error(`Failed initial ping ${error.uri}`)
           this.handleError(error)
         }
       )
@@ -113,7 +125,7 @@ export class StratumConnection {
           this.onSocketClose()
         }
         socket.onerror = event => {
-          this.error = new Error(JSON.stringify(event))
+          this.error = new StratumError(JSON.stringify(event), this.uri)
         }
         socket.onopen = event => {
           this.onSocketConnect()
@@ -146,7 +158,7 @@ export class StratumConnection {
           })
           .then(socket => {
             socket.on('close', () => this.onSocketClose())
-            socket.on('error', (e: Error) => {
+            socket.on('error', (e: StratumError) => {
               this.error = e
             })
             socket.on('open', () => this.onSocketConnect())
@@ -204,7 +216,7 @@ export class StratumConnection {
   /**
    * Closes the connection in response to an error.
    */
-  handleError(e: Error) {
+  handleError(e: StratumError) {
     if (!this.error) this.error = e
     if (this.connected && this.socket) this.disconnect()
     else this.cancelConnect = true
@@ -242,14 +254,14 @@ export class StratumConnection {
   partialMessage: string
   socket: EdgeSocket | WebSocket | void
   timer: TimeoutID
-  error: Error | void
+  error: StratumError | void
   sigkill: boolean
 
   /**
    * Called when the socket disconnects for any reason.
    */
   onSocketClose() {
-    const error = this.error || new Error('Socket closed')
+    const error = this.error || new StratumError('Socket closed', this.uri)
     clearTimeout(this.timer)
     this.connected = false
     this.socket = undefined
@@ -330,10 +342,16 @@ export class StratumConnection {
         const { error } = json
         try {
           if (error) {
-            const errorMessage = error.message
+            let errorMessage = error.message
               ? error.message.split('\n')[0]
               : error.code
-            throw new Error(errorMessage)
+            // Check for common words found in spam server transaction broadcast responses
+            const spamCheck = /(security|upgrade|image)/i
+            if (spamCheck.test(error.message)) {
+              this.callbacks.onSpamServerError(this.uri, 100)
+              errorMessage = 'A connection error occurred. Try sending again'
+            }
+            throw new StratumError(errorMessage, this.uri)
           }
           message.task.onDone(json.result, now - message.startTime)
         } catch (e) {
@@ -386,13 +404,13 @@ export class StratumConnection {
               (version: string) => {
                 this.callbacks.onTimer(now)
               },
-              (e: Error) => this.handleError(e)
+              (e: StratumError) => this.handleError(e)
             )
           : fetchPing(
               () => {
                 this.callbacks.onTimer(now)
               },
-              (e: Error) => this.handleError(e)
+              (e: StratumError) => this.handleError(e)
             )
       )
     }
@@ -401,7 +419,7 @@ export class StratumConnection {
       const message = this.pendingMessages[id]
       if (message.startTime + this.timeout < now) {
         try {
-          message.task.onFail(new Error('Timeout'))
+          message.task.onFail(new StratumError('Timeout', this.uri))
         } catch (e) {
           this.logError(e)
         }

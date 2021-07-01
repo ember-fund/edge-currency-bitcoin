@@ -40,7 +40,7 @@ export class ServerCache {
    */
   serverCacheLoad(
     oldServers: { [serverUrl: string]: ServerInfo },
-    newServers: Array<string> = []
+    newServers: string[] = []
   ) {
     //
     // Add any new servers coming out of the info server
@@ -105,8 +105,8 @@ export class ServerCache {
   }
 
   printServerCache() {
-    this.log('**** printServerCache ****')
-    const serverInfos: Array<ServerInfo> = []
+    this.log.warn('**** printServerCache ****')
+    const serverInfos: ServerInfo[] = []
     for (const s in this.servers_) {
       serverInfos.push(this.servers_[s])
     }
@@ -120,9 +120,9 @@ export class ServerCache {
       const response = s.responseTime.toString()
       const numResponse = s.numResponseTimes.toString()
       const url = s.serverUrl
-      this.log(`ServerCache ${score} ${response}ms ${numResponse} ${url}`)
+      this.log.warn(`ServerCache ${score} ${response}ms ${numResponse} ${url}`)
     }
-    this.log('**************************')
+    this.log.warn('**************************')
   }
 
   serverScoreUp(
@@ -192,14 +192,14 @@ export class ServerCache {
 
   getServers(
     numServersWanted: number,
-    includePatterns?: Array<string> = []
-  ): Array<string> {
+    includePatterns?: string[] = []
+  ): string[] {
     if (!this.servers_ || this.servers_.length === 0) {
       return []
     }
 
-    let serverInfos: Array<ServerInfo> = []
-    let newServerInfos: Array<ServerInfo> = []
+    let serverInfos: ServerInfo[] = []
+    let newServerInfos: ServerInfo[] = []
     //
     // Find new servers and cache them away
     //

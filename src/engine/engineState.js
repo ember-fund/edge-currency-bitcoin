@@ -13,7 +13,10 @@ import type {
   StratumCallbacks,
   StratumTask
 } from '../stratum/stratumConnection.js'
-import { StratumConnection } from '../stratum/stratumConnection.js'
+import {
+  type StratumError,
+  StratumConnection
+} from '../stratum/stratumConnection.js'
 import type {
   StratumBlockHeader,
   StratumHistoryRow,
@@ -42,8 +45,8 @@ export type UtxoInfo = {
 }
 
 export type AddressInfo = {
-  txids: Array<string>,
-  utxos: Array<UtxoInfo>,
+  txids: string[],
+  utxos: UtxoInfo[],
   used: boolean, // Set manually by `addGapLimitAddress`
   displayAddress: string, // base58 or other wallet-ready format
   path: string, // TODO: Define the contents of this member.
@@ -114,10 +117,10 @@ export class EngineState extends EventEmitter {
   // On-disk address information:
   addressCache: {
     [scriptHash: string]: {
-      txids: Array<string>,
+      txids: string[],
       txidStratumHash: string,
 
-      utxos: Array<UtxoInfo>,
+      utxos: UtxoInfo[],
       utxoStratumHash: string,
 
       displayAddress: string, // base58 or other wallet-ready format
@@ -230,7 +233,7 @@ export class EngineState extends EventEmitter {
     }
   }
 
-  markAddressesUsed(scriptHashes: Array<string>) {
+  markAddressesUsed(scriptHashes: string[]) {
     for (const scriptHash of scriptHashes) {
       this.usedAddresses[scriptHash] = true
       this.refreshAddressInfo(scriptHash)
@@ -243,7 +246,7 @@ export class EngineState extends EventEmitter {
       await this.encryptedLocalDisklet.setText('keys.json', json)
       this.log(`Saved keys cache`)
     } catch (e) {
-      this.log(`${e.toString()}`)
+      this.log.error(`${e.toString()}`)
     }
   }
 
@@ -256,7 +259,7 @@ export class EngineState extends EventEmitter {
       // TODO: Validate JSON
       return keysCacheJson.keys
     } catch (e) {
-      this.log(`Failed to load key cache: ${e}`)
+      this.log.error(`Failed to load key cache: ${e}`)
       return {}
     }
   }
@@ -278,18 +281,19 @@ export class EngineState extends EventEmitter {
       const task = broadcastTx(
         rawTx,
         (txid: string) => {
-          this.log(`broadcastTx success: ${txid}`)
+          this.log.warn(`broadcastTx success: ${txid}`)
           // We resolve if any server succeeds:
           if (!resolved) {
             resolved = true
             resolve(txid)
           }
         },
-        (e?: Error) => {
+        (e?: StratumError) => {
+          if (e) {
+            this.log.error(`broadcastTx fail: ${e.uri}\n${e.message}\n${rawTx}`)
+          }
           // We fail if every server failed:
           if (++bad === uris.length) {
-            const msg = e ? `With error ${e.toString()}` : ''
-            this.log(`broadcastTx fail: ${rawTx}\n${msg}}`)
             reject(e)
           }
         }
@@ -417,7 +421,7 @@ export class EngineState extends EventEmitter {
   reconnectCounter: number
   progressRatio: number
   txCacheInitSize: number
-  serverList: Array<string>
+  serverList: string[]
 
   constructor(options: EngineStateOptions) {
     super()
@@ -473,7 +477,6 @@ export class EngineState extends EventEmitter {
           delete this.reconnectTimer
           this.refillServers()
         }, this.reconnectCounter * 1000)
-      } else {
       }
     }
   }
@@ -587,8 +590,13 @@ export class EngineState extends EventEmitter {
         },
         onClose: (error?: Error) => {
           delete this.connections[uri]
-          const msg = error ? ` !! Connection ERROR !! ${error.message}` : ''
-          this.log(`${prefix} onClose ${msg}`)
+          error
+            ? this.log.error(
+                `${prefix} onClose  !! Connection ERROR !! ${
+                  error.message || ''
+                }`
+              )
+            : this.log(`${prefix} onClose`)
           this.emit('connectionClose', uri)
           if (error != null) {
             if (/Bad Stratum version/.test(error.message)) {
@@ -610,9 +618,10 @@ export class EngineState extends EventEmitter {
           }
           return task
         },
-        onTimer: (queryTime: number) => {
+        onTimer: (queryDate: number) => {
+          const queryTime = Date.now() - queryDate
           this.log(`${prefix} returned version in ${queryTime}ms`)
-          this.pluginState.serverScoreUp(uri, Date.now() - queryTime)
+          this.pluginState.serverScoreUp(uri, queryTime)
         },
         onVersion: (version: string, requestMs) => {
           this.log(`${prefix} received version ${version}`)
@@ -629,6 +638,10 @@ export class EngineState extends EventEmitter {
           const addressState = this.serverStates[uri].addresses[scriptHash]
           addressState.hash = hash
           addressState.lastUpdate = Date.now()
+        },
+        onSpamServerError: (uri: string, score?: number) => {
+          this.log.error(`${prefix} returned spam response`)
+          this.pluginState.serverScoreDown(uri, score)
         }
       }
 
@@ -669,9 +682,9 @@ export class EngineState extends EventEmitter {
           this.pluginState.updateHeight(height)
           this.pluginState.serverScoreUp(uri, Date.now() - queryTime)
         },
-        (e: Error) => {
+        (e: StratumError) => {
           serverState.fetchingHeight = false
-          this.handleMessageError(uri, 'subscribing to height', e)
+          this.handleMessageError('subscribing to height', e)
         }
       )
     }
@@ -696,11 +709,10 @@ export class EngineState extends EventEmitter {
             this.pluginState.serverScoreUp(uri, Date.now() - queryTime)
             this.handleHeaderFetch(height, header)
           },
-          (e: Error) => {
+          (e: StratumError) => {
             this.fetchingHeaders[height] = false
             if (!serverState.headers[height]) {
               this.handleMessageError(
-                uri,
                 `getting header for block number ${height}`,
                 e
               )
@@ -727,10 +739,10 @@ export class EngineState extends EventEmitter {
             this.handleTxFetch(txid, txData)
             this.updateProgressRatio()
           },
-          (e: Error) => {
+          (e: StratumError) => {
             this.fetchingTxs[txid] = false
             if (!serverState.txids[txid]) {
-              this.handleMessageError(uri, `getting transaction ${txid}`, e)
+              this.handleMessageError(`getting transaction ${txid}`, e)
             } else {
               // TODO: Don't penalize the server score either.
             }
@@ -752,7 +764,7 @@ export class EngineState extends EventEmitter {
         const queryTime = Date.now()
         return fetchScriptHashUtxo(
           address,
-          (utxos: Array<StratumUtxo>) => {
+          (utxos: StratumUtxo[]) => {
             this.log(`${prefix} received utxos for: ${address}`)
             addressState.fetchingUtxos = false
             if (!addressState.hash) {
@@ -763,9 +775,9 @@ export class EngineState extends EventEmitter {
             this.pluginState.serverScoreUp(uri, Date.now() - queryTime)
             this.handleUtxoFetch(address, addressState.hash || '', utxos)
           },
-          (e: Error) => {
+          (e: StratumError) => {
             addressState.fetchingUtxos = false
-            this.handleMessageError(uri, `fetching utxos for: ${address}`, e)
+            this.handleMessageError(`fetching utxos for: ${address}`, e)
           }
         )
       }
@@ -805,9 +817,9 @@ export class EngineState extends EventEmitter {
               this.updateProgressRatio()
             }
           },
-          (e: Error) => {
+          (e: StratumError) => {
             addressState.subscribing = false
-            this.handleMessageError(uri, `subscribing to ${address}`, e)
+            this.handleMessageError(`subscribing to ${address}`, e)
           }
         )
       }
@@ -826,7 +838,7 @@ export class EngineState extends EventEmitter {
         const queryTime = Date.now()
         return fetchScriptHashHistory(
           address,
-          (history: Array<StratumHistoryRow>) => {
+          (history: StratumHistoryRow[]) => {
             this.log(`${prefix} received history for ${address}`)
             addressState.fetchingTxids = false
             if (!addressState.hash) {
@@ -837,13 +849,9 @@ export class EngineState extends EventEmitter {
             this.pluginState.serverScoreUp(uri, Date.now() - queryTime)
             this.handleHistoryFetch(address, addressState, history)
           },
-          (e: Error) => {
+          (e: StratumError) => {
             addressState.fetchingTxids = false
-            this.handleMessageError(
-              uri,
-              `getting history for address ${address}`,
-              e
-            )
+            this.handleMessageError(`getting history for address ${address}`, e)
           }
         )
       }
@@ -873,7 +881,7 @@ export class EngineState extends EventEmitter {
       this.txCache = txs
       this.parsedTxs = parsedTxs
     } catch (e) {
-      this.log(`Failed to load transaction cache: ${e}`)
+      this.log.error(`Failed to load transaction cache: ${e}`)
     }
 
     // Load the address and height caches.
@@ -913,7 +921,7 @@ export class EngineState extends EventEmitter {
       this.addressCache = {}
       this.addressInfos = {}
       this.txHeightCache = {}
-      this.log(`Failed to load address cache: ${e}`)
+      this.log.error(`Failed to load address cache: ${e}`)
     }
 
     return this
@@ -953,7 +961,7 @@ export class EngineState extends EventEmitter {
         this.log(`- Saved address cache`)
         this.addressCacheDirty = false
       } catch (e) {
-        this.log(`- saveAddressCache - ${e.toString()}`)
+        this.log.error(`- saveAddressCache - ${e.toString()}`)
       }
     }
   }
@@ -969,7 +977,7 @@ export class EngineState extends EventEmitter {
         this.log(`Saved txCache`)
         this.txCacheDirty = false
       } catch (e) {
-        this.log(`Error saving txCache: ${e.toString()}`)
+        this.log.error(`Error saving txCache: ${e.toString()}`)
       }
     }
   }
@@ -1040,10 +1048,10 @@ export class EngineState extends EventEmitter {
   handleHistoryFetch(
     scriptHash: string,
     addressState: AddressState,
-    history: Array<StratumHistoryRow>
+    history: StratumHistoryRow[]
   ) {
     // Process the txid list:
-    const txidList: Array<string> = []
+    const txidList: string[] = []
     for (const row of history) {
       txidList.push(row.tx_hash)
       this.handleTxidFetch(row.tx_hash, row.height)
@@ -1127,13 +1135,9 @@ export class EngineState extends EventEmitter {
   }
 
   // A server has sent UTXO data, so update the caches:
-  handleUtxoFetch(
-    scriptHash: string,
-    stateHash: string,
-    utxos: Array<StratumUtxo>
-  ) {
+  handleUtxoFetch(scriptHash: string, stateHash: string, utxos: StratumUtxo[]) {
     // Process the UTXO list:
-    const utxoList: Array<UtxoInfo> = []
+    const utxoList: UtxoInfo[] = []
     for (const utxo of utxos) {
       utxoList.push({
         txid: utxo.tx_hash,
@@ -1223,7 +1227,7 @@ export class EngineState extends EventEmitter {
     if (prevUsed !== used) this.onAddressUsed()
   }
 
-  findAffectedAddressesForInputs(txid: string): Array<string> {
+  findAffectedAddressesForInputs(txid: string): string[] {
     const scriptHashSet = []
     for (const input of this.parsedTxs[txid].inputs) {
       const prevTx = this.parsedTxs[input.prevout.rhash()]
@@ -1235,7 +1239,7 @@ export class EngineState extends EventEmitter {
     return scriptHashSet
   }
 
-  findAffectedAddressesForOutput(txid: string): Array<string> {
+  findAffectedAddressesForOutput(txid: string): string[] {
     const scriptHashSet = []
     for (const output of this.parsedTxs[txid].outputs) {
       if (this.addressCache[output.scriptHash]) {
@@ -1245,14 +1249,14 @@ export class EngineState extends EventEmitter {
     return scriptHashSet
   }
 
-  findAffectedAddresses(txid: string): Array<string> {
+  findAffectedAddresses(txid: string): string[] {
     const inputs = this.findAffectedAddressesForInputs(txid)
     const outputs = this.findAffectedAddressesForOutput(txid)
     return inputs.concat(outputs)
   }
 
   // Finds the txids that a are in a block.
-  findAffectedTransactions(height: string): Array<string> {
+  findAffectedTransactions(height: string): string[] {
     const txids = []
     for (const txid in this.txHeightCache) {
       const tx = this.txHeightCache[txid]
@@ -1261,11 +1265,11 @@ export class EngineState extends EventEmitter {
     return txids
   }
 
-  handleMessageError(uri: string, task: string, e: Error) {
+  handleMessageError(task: string, e: StratumError) {
     const msg = `connection closed ERROR: ${e.message}`
-    this.log(`${uri.replace('electrum://', '')}: ${msg}: task: ${task}`)
-    if (this.connections[uri]) {
-      this.connections[uri].handleError(e)
+    this.log.error(`${e.uri}: ${msg}: task: ${task}`)
+    if (this.connections[e.uri]) {
+      this.connections[e.uri].handleError(e)
     }
   }
 

@@ -4,7 +4,6 @@ import { type EdgeCurrencyInfo } from 'edge-core-js/types'
 
 import type { EngineCurrencyInfo } from '../engine/currencyEngine.js'
 import type { BcoinCurrencyInfo } from '../utils/bcoinExtender/bcoinExtender.js'
-import { imageServerUrl } from './constants.js'
 
 const bcoinInfo: BcoinCurrencyInfo = {
   type: 'ravencoin',
@@ -46,12 +45,9 @@ const engineInfo: EngineCurrencyInfo = {
           `Cannot interpret block header ${header.toString('hex')}`
         )
       }
-    } else {
-      if (header.length !== 120) {
-        throw new Error(
-          `Cannot interpret block header ${header.toString('hex')}`
-        )
-      }
+    } else if (header.length !== 120 && header.length !== 80) {
+      // Allow for both 120 and 80 in case miner mines a old block
+      throw new Error(`Cannot interpret block header ${header.toString('hex')}`)
     }
     return header.readUInt32LE(4 + 32 + 32)
   }
@@ -76,11 +72,7 @@ const currencyInfo: EdgeCurrencyInfo = {
   // Explorers:
   addressExplorer: 'https://ravencoin.network/address/%s',
   blockExplorer: 'https://ravencoin.network/block/%s',
-  transactionExplorer: 'https://ravencoin.network/tx/%s',
-
-  // Images:
-  symbolImage: `${imageServerUrl}/ravencoin-logo-solo-64.png`,
-  symbolImageDarkMono: `${imageServerUrl}/ravencoin-logo-solo-64.png`
+  transactionExplorer: 'https://ravencoin.network/tx/%s'
 }
 
 export const ravencoin = { bcoinInfo, engineInfo, currencyInfo }

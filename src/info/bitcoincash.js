@@ -5,7 +5,6 @@ import { type EdgeCurrencyInfo } from 'edge-core-js/types'
 import type { EngineCurrencyInfo } from '../engine/currencyEngine.js'
 import type { BcoinCurrencyInfo } from '../utils/bcoinExtender/bcoinExtender.js'
 import { cashAddress, scriptTemplates } from './bitcoincashUtils/cashUtils'
-import { imageServerUrl } from './constants.js'
 
 const bcoinInfo: BcoinCurrencyInfo = {
   type: 'bitcoincash',
@@ -104,14 +103,12 @@ const currencyInfo: EdgeCurrencyInfo = {
   metaTokens: [],
 
   // Explorers:
-  blockExplorer: 'https://blockchair.com/bitcoin-cash/block/%s',
-  addressExplorer: 'https://blockchair.com/bitcoin-cash/address/%s',
-  transactionExplorer: 'https://blockchair.com/bitcoin-cash/transaction/%s',
-  xpubExplorer: 'https://blockchair.com/bitcoin-cash/xpub/%s',
-
-  // Images:
-  symbolImage: `${imageServerUrl}/bitcoincash-logo-solo-64.png`,
-  symbolImageDarkMono: `${imageServerUrl}/bitcoincash-logo-solo-64.png`
+  blockExplorer: 'https://blockchair.com/bitcoin-cash/block/%s?from=edgeapp',
+  addressExplorer:
+    'https://blockchair.com/bitcoin-cash/address/%s?from=edgeapp',
+  transactionExplorer:
+    'https://blockchair.com/bitcoin-cash/transaction/%s?from=edgeapp',
+  xpubExplorer: 'https://blockchair.com/bitcoin-cash/xpub/%s?from=edgeapp'
 }
 
 export const bitcoincash = { bcoinInfo, engineInfo, currencyInfo }

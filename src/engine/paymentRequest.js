@@ -7,7 +7,7 @@ import parse from 'url-parse'
 import { toLegacyFormat, toNewFormat } from '../utils/addressFormat.js'
 
 const getSpendTargets = (
-  outputs: Array<any>,
+  outputs: any[],
   network: string,
   currencyCode: string
 ) => {
@@ -111,7 +111,7 @@ export async function sendPayment(
       const paymentACK = JSON.parse(result)
       return paymentACK
     } catch (e) {
-      log(e)
+      log.error(e)
       throw e
     }
   }

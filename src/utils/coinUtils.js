@@ -28,7 +28,7 @@ export type Txid = string
 
 export type Script = {
   type: string,
-  params?: Array<string>
+  params?: string[]
 }
 
 export type Output = {
@@ -49,7 +49,7 @@ export type Utxo = {
 }
 
 export type TxOptions = {
-  utxos?: Array<Utxo>,
+  utxos?: Utxo[],
   setRBF?: boolean,
   RBFraw?: RawTx,
   CPFP?: Txid,
@@ -59,13 +59,14 @@ export type TxOptions = {
 }
 
 export type CreateTxOptions = {
-  utxos: Array<Utxo>,
+  utxos: Utxo[],
   rate: number,
   changeAddress: string,
   network: string,
-  outputs?: Array<StandardOutput>,
+  outputs?: StandardOutput[],
   height?: BlockHeight,
   estimate?: Function,
+  minRelay?: number,
   txOptions: TxOptions
 }
 
@@ -142,10 +143,7 @@ export const verifyUriProtocol = (
 ) => {
   const { uriPrefix = '' } = networks[network] || {}
   if (protocol) {
-    const prot = protocol
-      .replace(':', '')
-      .replace('-', '')
-      .toLowerCase()
+    const prot = protocol.replace(':', '').replace('-', '').toLowerCase()
     if (prot === 'pay') return true
     return prot === pluginId || prot === uriPrefix
   }
@@ -189,6 +187,7 @@ export const createTX = async ({
   height = -1,
   estimate,
   network,
+  minRelay,
   txOptions: {
     selection = 'value',
     RBFraw = '',
@@ -261,7 +260,8 @@ export const createTX = async ({
     subtractFee,
     height,
     rate,
-    estimate
+    estimate,
+    minRelay
   })
 
   // If TX is RBF mark is by changing the Inputs sequences
@@ -330,16 +330,13 @@ export const parseJsonTransaction = (txJson: Object): Object => {
   return bcoinTx
 }
 
-export const parsePath = (
-  path: string = '',
-  masterPath: string
-): Array<number> =>
+export const parsePath = (path: string = '', masterPath: string): number[] =>
   (path.split(`${masterPath}`)[1] || '')
     .split('/')
     .filter(i => i !== '')
     .map(i => parseInt(i))
 
-export const sumUtxos = (utxos: Array<Utxo>) =>
+export const sumUtxos = (utxos: Utxo[]) =>
   utxos.reduce((s, { tx, index }) => s + parseInt(tx.outputs[index].value), 0)
 
 export const getLock = () => new utils.Lock()
@@ -396,7 +393,7 @@ export const sumTransaction = (
         ? serializers.address.encode(address)
         : address
     } catch (e) {
-      engineState.log(e)
+      engineState.log.error(e)
       if (value <= 0) {
         continue
       } else {
@@ -442,7 +439,7 @@ export const sumTransaction = (
   return { nativeAmount, fee, ourReceiveAddresses }
 }
 
-export const filterOutputs = (outputs: Array<any>): Array<any> =>
+export const filterOutputs = (outputs: any[]): any[] =>
   outputs.filter(output => {
     const type = output.getType()
     return type !== 'nonstandard' && type !== 'nulldata'
@@ -451,7 +448,7 @@ export const filterOutputs = (outputs: Array<any>): Array<any> =>
 export const getReceiveAddresses = (
   bcoinTx: Object,
   network: string
-): Array<string> =>
+): string[] =>
   filterOutputs(bcoinTx.outputs).map(output => {
     const address = output.getAddress().toString(network)
     return toNewFormat(address, network)

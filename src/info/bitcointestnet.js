@@ -5,7 +5,6 @@ import { type EdgeCurrencyInfo } from 'edge-core-js/types'
 
 import type { EngineCurrencyInfo } from '../engine/currencyEngine.js'
 import type { BcoinCurrencyInfo } from '../utils/bcoinExtender/bcoinExtender.js'
-import { imageServerUrl } from './constants.js'
 
 const hash256 = (rawTx: string) => {
   const buf = Buffer.from(rawTx, 'hex')
@@ -39,7 +38,7 @@ const bcoinInfo: BcoinCurrencyInfo = {
 
 const engineInfo: EngineCurrencyInfo = {
   network: 'bitcointestnet',
-  currencyCode: 'TBTC',
+  currencyCode: 'TESTBTC',
   gapLimit: 10,
   defaultFee: 1000,
   feeUpdateInterval: 60000,
@@ -57,12 +56,12 @@ const engineInfo: EngineCurrencyInfo = {
 
 const currencyInfo: EdgeCurrencyInfo = {
   // Basic currency information:
-  currencyCode: 'TBTC',
+  currencyCode: 'TESTBTC',
   displayName: 'Bitcoin Testnet',
   pluginId: 'bitcointestnet',
   denominations: [
-    { name: 'TBTC', multiplier: '100000000', symbol: '₿' },
-    { name: 'mTBTC', multiplier: '100000', symbol: 'm₿' },
+    { name: 'TESTBTC', multiplier: '100000000', symbol: '₿' },
+    { name: 'mTESTBTC', multiplier: '100000', symbol: 'm₿' },
     { name: 'bits', multiplier: '100', symbol: 'ƀ' },
     { name: 'sats', multiplier: '1', symbol: 's' }
   ],
@@ -82,11 +81,7 @@ const currencyInfo: EdgeCurrencyInfo = {
   // Explorers:
   blockExplorer: 'https://live.blockcypher.com/btc-testnet/block/%s',
   addressExplorer: 'https://live.blockcypher.com/btc-testnet/address/%s',
-  transactionExplorer: 'https://live.blockcypher.com/btc-testnet/tx/%s',
-
-  // Images:
-  symbolImage: `${imageServerUrl}/bitcoin-logo-solo-64.png`,
-  symbolImageDarkMono: `${imageServerUrl}/bitcoin-logo-solo-64.png`
+  transactionExplorer: 'https://live.blockcypher.com/btc-testnet/tx/%s'
 }
 
 export const bitcoinTestnet = { bcoinInfo, engineInfo, currencyInfo }

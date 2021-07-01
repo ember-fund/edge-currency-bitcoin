@@ -4,7 +4,6 @@ import { type EdgeCurrencyInfo } from 'edge-core-js/types'
 
 import type { EngineCurrencyInfo } from '../engine/currencyEngine.js'
 import type { BcoinCurrencyInfo } from '../utils/bcoinExtender/bcoinExtender.js'
-import { imageServerUrl } from './constants.js'
 
 const bcoinInfo: BcoinCurrencyInfo = {
   type: 'eboost',
@@ -30,7 +29,6 @@ const engineInfo: EngineCurrencyInfo = {
   gapLimit: 10,
   defaultFee: 500000,
   feeUpdateInterval: 60000,
-  infoServer: 'https://info1.edgesecure.co:8444/v1',
   customFeeSettings: ['satPerByte'],
   simpleFeeSettings: {
     highFee: '300',
@@ -68,11 +66,7 @@ const currencyInfo: EdgeCurrencyInfo = {
   // Explorers:
   addressExplorer: 'https://www.blockexperts.com/ebst/address/%s',
   blockExplorer: 'https://www.blockexperts.com/ebst/hash/%s',
-  transactionExplorer: 'https://www.blockexperts.com/ebst/tx/%s',
-
-  // Images:
-  symbolImage: `${imageServerUrl}/eboost-logo-solo-64.png`,
-  symbolImageDarkMono: `${imageServerUrl}/eboost-logo-solo-64.png`
+  transactionExplorer: 'https://www.blockexperts.com/ebst/tx/%s'
 }
 
 export const eboost = { bcoinInfo, engineInfo, currencyInfo }
